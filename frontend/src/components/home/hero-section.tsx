@@ -35,7 +35,7 @@ export function HeroSection() {
               </Link>
             </Button>
             <Button variant="outline" className="h-11 border-border bg-surface px-5 font-semibold" asChild>
-              <Link href="#organize">Create an Event</Link>
+              <Link href="#subscribe">Subscribe for Updates</Link>
             </Button>
           </div>
 

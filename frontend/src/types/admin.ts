@@ -80,6 +80,10 @@ export interface UserRecord {
   status: "Active" | "Inactive"; joined: string; lastActive: string;
 }
 export interface RoleRecord { id: string; name: string; description: string; users: number; permissions: string[]; }
+export interface SpeakerRecord {
+  id: string; name: string; email: string; title: string; organization: string;
+  event: string; status: "Confirmed" | "Pending"; initials: string;
+}
 export interface NotificationRecord {
   id: string; title: string; description: string; type: string; time: string; read: boolean;
 }

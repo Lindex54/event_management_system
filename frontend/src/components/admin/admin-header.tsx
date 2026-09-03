@@ -40,12 +40,17 @@ export function AdminHeader() {
     "/admin/reports": "Reports",
     "/admin/analytics": "Analytics",
     "/admin/notifications": "Notifications",
+    "/admin/discussions": "Discussions",
     "/admin/email": "Email",
     "/admin/activity-logs": "Activity Logs",
     "/admin/settings": "Settings",
   };
   const currentTitle = pageTitles[pathname]
-    ?? (pathname.startsWith("/admin/events/") ? "Event Details" : "Administration");
+    ?? (pathname.startsWith("/admin/events/")
+      ? "Event Details"
+      : pathname.startsWith("/admin/discussions/")
+        ? "Discussion Room"
+        : "Administration");
 
   return (
     <header className="sticky top-0 z-30 flex h-17 items-center border-b border-border bg-surface/95 px-4 backdrop-blur sm:px-6">

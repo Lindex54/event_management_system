@@ -7,10 +7,10 @@ import { CalendarCheck, CalendarDays, CalendarPlus, CircleX, Clock3, Copy, Eye, 
 import { toast } from "sonner";
 
 import { InvitePeopleDialog } from "@/components/admin/invite-people-dialog";
+import { CreateEventDialog } from "@/components/admin/create-event-dialog";
 import { ConfirmDialog } from "@/components/admin/shared/confirm-dialog";
 import { DataTable, type ManagementColumn } from "@/components/admin/shared/data-table";
 import { DatePickerFilter } from "@/components/admin/shared/date-picker-filter";
-import { FormDialog } from "@/components/admin/shared/form-dialog";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { StatCards } from "@/components/admin/shared/stat-cards";
 import { StatusBadge } from "@/components/admin/shared/status-badge";
@@ -80,11 +80,7 @@ export function EventsPage() {
     <div className="mx-auto max-w-[1600px] space-y-5 p-4 sm:p-6">
       <PageHeader title="Events" description="Manage all events across the platform." actions={<>
         <InvitePeopleDialog trigger={<Button variant="outline" className="bg-surface"><Send /> Invite People</Button>} />
-        <FormDialog trigger={<Button><CalendarPlus /> Create Event</Button>} title="Create event" description="Add a new event to the platform." submitLabel="Create event" successMessage="Event created" fields={[
-          { name: "name", label: "Event name", required: true }, { name: "organizer", label: "Organizer", required: true },
-          { name: "date", label: "Date", type: "date", required: true }, { name: "time", label: "Time", required: true },
-          { name: "venue", label: "Venue", required: true }, { name: "status", label: "Status", type: "select", options: ["Draft", "Upcoming", "Active"], required: true },
-        ]} />
+        <CreateEventDialog trigger={<Button><CalendarPlus /> Create Event</Button>} />
       </>} />
       <StatCards items={statItems} />
       <DataTable data={filtered} columns={columns} getRowId={(row) => row.id} searchPlaceholder="Search event or organizer..." toolbar={<>

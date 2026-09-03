@@ -11,6 +11,8 @@ import {
   LayoutDashboard,
   Mail,
   MapPin,
+  Mic,
+  MessagesSquare,
   Settings,
   ShieldCheck,
   UserCog,
@@ -39,6 +41,7 @@ const navigation = [
     items: [
       { label: "Users", href: "/admin/users", icon: Users },
       { label: "Roles & Permissions", href: "/admin/roles", icon: ShieldCheck },
+      { label: "Speakers", href: "/admin/speakers", icon: Mic },
     ],
   },
   {
@@ -51,6 +54,7 @@ const navigation = [
   {
     label: "Communication",
     items: [
+      { label: "Discussions", href: "/admin/discussions", icon: MessagesSquare },
       { label: "Notifications", href: "/admin/notifications", icon: Bell },
       { label: "Email", href: "/admin/email", icon: Mail },
     ],
@@ -88,7 +92,10 @@ export function AdminSidebar({ className, onNavigate }: { className?: string; on
       <div className="flex h-17 items-center border-b border-white/10 px-5">
         <AdminBrand />
       </div>
-      <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-5" aria-label="Administrator navigation">
+      <nav
+        className="flex-1 space-y-5 overflow-y-auto px-3 py-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        aria-label="Administrator navigation"
+      >
         {navigation.map((group) => (
           <div key={group.label || "dashboard"}>
             {group.label && (

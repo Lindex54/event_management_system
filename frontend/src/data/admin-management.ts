@@ -9,6 +9,7 @@ import type {
   ManagementEvent,
   NotificationRecord,
   RoleRecord,
+  SpeakerRecord,
   UserRecord,
   VenueRecord,
 } from "@/types/admin";
@@ -69,6 +70,14 @@ export const roleRecords: RoleRecord[] = [
   { id: "organizer", name: "Event Organizer", description: "Creates and manages events, attendees and communication.", users: 86, permissions: ["View Events", "Create Events", "Edit Events", "View Registrations", "Manage Registrations", "View Attendees", "Manage Attendees", "View Reports"] },
   { id: "staff", name: "Event Staff", description: "Supports registrations, attendee check-in and event operations.", users: 42, permissions: ["View Events", "View Registrations", "Manage Registrations", "View Attendees"] },
   { id: "attendee", name: "Attendee", description: "Registers for public events and manages personal registrations.", users: 7918, permissions: ["View Events"] },
+];
+
+export const speakerRecords: SpeakerRecord[] = [
+  { id: "SPK-101", name: "Dr. Amina Nsubuga", email: "amina@example.com", title: "AI Research Lead", organization: "Makerere AI Lab", event: "AI Innovation Summit 2026", status: "Confirmed", initials: "AN" },
+  { id: "SPK-102", name: "James Okello", email: "james@example.com", title: "Founder & CEO", organization: "Nile Ventures", event: "East Africa Tech Expo", status: "Confirmed", initials: "JO" },
+  { id: "SPK-103", name: "Prof. Sarah Atwine", email: "sarah.atwine@example.com", title: "Research Director", organization: "Uganda Science Council", event: "Annual Research Conference", status: "Pending", initials: "SA" },
+  { id: "SPK-104", name: "Michael Kato", email: "michael@example.com", title: "Creative Director", organization: "Studio Kampala", event: "Creative Economy Forum", status: "Confirmed", initials: "MK" },
+  { id: "SPK-105", name: "Lydia Namara", email: "lydia@example.com", title: "Talent Strategy Lead", organization: "Career Bridge", event: "Graduate Career Expo", status: "Pending", initials: "LN" },
 ];
 
 export const notificationRecords: NotificationRecord[] = [

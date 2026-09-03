@@ -20,6 +20,9 @@ dist/
 build/
 **/build/
 
+# Generated / locally imported database schema
+/backend/database/event_management_system.sql
+
 # ==========================================
 # Environment variables / secrets
 # ==========================================

@@ -4,6 +4,7 @@ import { CalendarPlus, UserPlus, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { InvitePeopleDialog } from "@/components/admin/invite-people-dialog";
+import { CreateEventDialog } from "@/components/admin/create-event-dialog";
 import { Button } from "@/components/ui/button";
 
 export function DashboardWelcome() {
@@ -28,9 +29,7 @@ export function DashboardWelcome() {
         <InvitePeopleDialog
           trigger={<Button variant="outline" className="bg-surface"><UserPlus /> Invite People</Button>}
         />
-        <Button onClick={() => toast.success("Create event action selected") }>
-          <CalendarPlus /> Create Event
-        </Button>
+        <CreateEventDialog trigger={<Button><CalendarPlus /> Create Event</Button>} />
       </div>
     </section>
   );

@@ -19,13 +19,14 @@ export interface FormField {
   required?: boolean;
 }
 
-export function FormDialog({ trigger, title, description, fields, submitLabel = "Save", successMessage }: {
+export function FormDialog({ trigger, title, description, fields, submitLabel = "Save", successMessage, onSave }: {
   trigger: React.ReactNode;
   title: string;
   description: string;
   fields: FormField[];
   submitLabel?: string;
   successMessage: string;
+  onSave?: (values: Record<string, string>) => void;
 }) {
   const [open, setOpen] = React.useState(false);
   const [values, setValues] = React.useState<Record<string, string>>({});
@@ -43,6 +44,7 @@ export function FormDialog({ trigger, title, description, fields, submitLabel = 
       setError("Enter a valid email address.");
       return;
     }
+    onSave?.(values);
     toast.success(successMessage);
     setValues({});
     setError("");

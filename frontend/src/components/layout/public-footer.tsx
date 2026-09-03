@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CalendarDays } from "lucide-react";
 
-const exploreLinks = ["Browse Events", "Featured Events", "Happening Soon", "Create an Event"];
+const exploreLinks = ["Browse Events", "Featured Events", "Happening Soon", "Subscribe for Updates"];
 const supportLinks = ["About Us", "Contact", "Help Center", "Privacy"];
 
 export function PublicFooter() {
@@ -36,7 +36,10 @@ export function PublicFooter() {
           <ul className="mt-4 space-y-3">
             {exploreLinks.map((link) => (
               <li key={link}>
-                <Link href="#events" className="text-sm text-slate-300 transition-colors hover:text-white">
+                <Link
+                  href={link === "Subscribe for Updates" ? "#subscribe" : "#events"}
+                  className="text-sm text-slate-300 transition-colors hover:text-white"
+                >
                   {link}
                 </Link>
               </li>
