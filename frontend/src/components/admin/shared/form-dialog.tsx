@@ -15,24 +15,35 @@ export interface FormField {
   label: string;
   type?: "text" | "email" | "tel" | "number" | "date" | "textarea" | "select";
   placeholder?: string;
-  options?: string[];
+  options?: Array<string | { label: string; value: string }>;
   required?: boolean;
 }
 
-export function FormDialog({ trigger, title, description, fields, submitLabel = "Save", successMessage, onSave }: {
-  trigger: React.ReactNode;
+export function FormDialog({ trigger, title, description, fields, submitLabel = "Save", successMessage, onSave, initialValues = {}, open: controlledOpen, onOpenChange }: {
+  trigger?: React.ReactNode;
   title: string;
   description: string;
   fields: FormField[];
   submitLabel?: string;
   successMessage: string;
-  onSave?: (values: Record<string, string>) => void;
+  onSave?: (values: Record<string, string>) => void | Promise<void>;
+  initialValues?: Record<string, string>;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = React.useState(false);
-  const [values, setValues] = React.useState<Record<string, string>>({});
+  const [internalOpen, setInternalOpen] = React.useState(false);
+  const [values, setValues] = React.useState<Record<string, string>>(initialValues);
   const [error, setError] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+  const open = controlledOpen ?? internalOpen;
 
-  function submit(event: React.FormEvent<HTMLFormElement>) {
+  function setOpen(nextOpen: boolean) {
+    if (nextOpen) { setValues(initialValues); setError(""); }
+    setInternalOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+  }
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const missing = fields.find((field) => field.required && !values[field.name]?.trim());
     if (missing) {
@@ -44,16 +55,19 @@ export function FormDialog({ trigger, title, description, fields, submitLabel = 
       setError("Enter a valid email address.");
       return;
     }
-    onSave?.(values);
-    toast.success(successMessage);
-    setValues({});
-    setError("");
-    setOpen(false);
+    try {
+      setSaving(true);
+      await onSave?.(values);
+      toast.success(successMessage);
+      setValues({}); setError(""); setOpen(false);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Unable to save this record.");
+    } finally { setSaving(false); }
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-lg">{title}</DialogTitle>
@@ -67,7 +81,7 @@ export function FormDialog({ trigger, title, description, fields, submitLabel = 
                 {field.type === "select" ? (
                   <Select value={values[field.name] ?? ""} onValueChange={(value) => setValues((current) => ({ ...current, [field.name]: value }))}>
                     <SelectTrigger id={`field-${field.name}`} className="h-10 w-full"><SelectValue placeholder={field.placeholder ?? `Select ${field.label.toLowerCase()}`} /></SelectTrigger>
-                    <SelectContent>{field.options?.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent>
+                    <SelectContent>{field.options?.map((option) => { const value = typeof option === "string" ? option : option.value; const label = typeof option === "string" ? option : option.label; return <SelectItem key={value} value={value}>{label}</SelectItem>; })}</SelectContent>
                   </Select>
                 ) : field.type === "textarea" ? (
                   <Textarea id={`field-${field.name}`} placeholder={field.placeholder} value={values[field.name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))} />
@@ -79,8 +93,8 @@ export function FormDialog({ trigger, title, description, fields, submitLabel = 
           </div>
           {error && <p className="text-sm text-danger" role="alert">{error}</p>}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit">{submitLabel}</Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+            <Button type="submit" disabled={saving}>{saving ? "Saving..." : submitLabel}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

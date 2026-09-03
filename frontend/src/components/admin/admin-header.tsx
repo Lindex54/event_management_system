@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Bell, ChevronDown, LogOut, Menu, Search, Settings, UserRound } from "lucide-react";
 
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
@@ -27,9 +27,22 @@ import {
 
 export function AdminHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+
+  async function signOut() {
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000"}/api/auth/admin/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } finally {
+      router.replace("/admin/login");
+      router.refresh();
+    }
+  }
   const pageTitles: Record<string, string> = {
-    "/admin": "Dashboard",
+    "/admin/dashboard": "Dashboard",
     "/admin/events": "Events",
     "/admin/registrations": "Registrations",
     "/admin/attendees": "Attendees",
@@ -102,7 +115,7 @@ export function AdminHeader() {
             <DropdownMenuItem><UserRound /> Profile</DropdownMenuItem>
             <DropdownMenuItem><Settings /> Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem><LogOut /> Sign out</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void signOut()}><LogOut /> Sign out</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

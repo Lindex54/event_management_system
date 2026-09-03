@@ -1,40 +1,23 @@
 "use client";
-
 import * as React from "react";
-import { Ban, Building2, CalendarDays, Eye, MapPin, MoreHorizontal, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { Building2, CalendarDays, MapPin, MoreHorizontal, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
-
 import { ConfirmDialog } from "@/components/admin/shared/confirm-dialog";
 import { DataTable, type ManagementColumn } from "@/components/admin/shared/data-table";
-import { FormDialog } from "@/components/admin/shared/form-dialog";
+import { FormDialog, type FormField } from "@/components/admin/shared/form-dialog";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { StatCards } from "@/components/admin/shared/stat-cards";
 import { StatusBadge } from "@/components/admin/shared/status-badge";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { venueRecords as initialRecords } from "@/data/admin-management";
-import type { VenueRecord } from "@/types/admin";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { adminApi } from "@/lib/admin-api";
 
-const venueFields = [
-  { name: "name", label: "Venue name", required: true }, { name: "location", label: "Address / Location", required: true },
-  { name: "capacity", label: "Capacity", type: "number" as const, required: true }, { name: "status", label: "Status", type: "select" as const, options: ["Available", "Active", "Disabled"], required: true },
-  { name: "description", label: "Description", type: "textarea" as const },
-];
+interface Venue { id:number; name:string; location:string; capacity:number; description:string|null; contact:string|null; status:"Available"|"Active"|"Disabled"; events:number; }
+const fields:FormField[]=[{name:"name",label:"Venue Name",required:true},{name:"location",label:"Address / Location",required:true},{name:"capacity",label:"Capacity",type:"number",required:true},{name:"contact",label:"Contact"},{name:"status",label:"Status",type:"select",options:["Available","Active","Disabled"],required:true},{name:"description",label:"Description",type:"textarea"}];
 
-export function VenuesPage() {
-  const [records, setRecords] = React.useState(initialRecords);
-  const [removeId, setRemoveId] = React.useState<string>();
-  const columns = React.useMemo<ManagementColumn<VenueRecord>[]>(() => [
-    { id: "venue", label: "Venue", accessor: (row) => `${row.name} ${row.location}`, cell: (row) => <div className="max-w-56 whitespace-normal"><p className="font-semibold text-text-primary">{row.name}</p><p className="text-xs">{row.location}</p></div> },
-    { id: "capacity", label: "Capacity", accessor: (row) => row.capacity, cell: (row) => row.capacity.toLocaleString() }, { id: "events", label: "Events", accessor: (row) => row.events },
-    { id: "status", label: "Availability", accessor: (row) => row.status, cell: (row) => <StatusBadge status={row.status} /> }, { id: "contact", label: "Contact", accessor: (row) => row.contact },
-    { id: "actions", label: "", accessor: (row) => row.id, sortable: false, className: "text-right", cell: (row) => <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm"><MoreHorizontal /></Button></DropdownMenuTrigger><DropdownMenuContent align="end">
-      <DropdownMenuItem onSelect={() => toast.info(row.description)}><Eye /> View</DropdownMenuItem><DropdownMenuItem onSelect={() => toast.info("Venue editor opened")}><Pencil /> Edit</DropdownMenuItem><DropdownMenuItem onSelect={() => toast.info(`${row.events} venue events selected`)}><CalendarDays /> View events</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => { setRecords((items) => items.map((item) => item.id === row.id ? { ...item, status: "Disabled" } : item)); toast.success("Venue disabled"); }}><Ban /> Disable</DropdownMenuItem><DropdownMenuItem variant="destructive" onSelect={() => setRemoveId(row.id)}><Trash2 /> Delete</DropdownMenuItem>
-    </DropdownMenuContent></DropdownMenu> },
-  ], []);
-  return <div className="mx-auto max-w-[1600px] space-y-5 p-4 sm:p-6"><PageHeader title="Venues" description="Manage locations, capacity and event availability." actions={<FormDialog trigger={<Button><Plus /> Add Venue</Button>} title="Add venue" description="Create a venue for future events." fields={venueFields} submitLabel="Save venue" successMessage="Venue saved" />} />
-    <StatCards items={[{ label: "Total Venues", value: records.length, icon: Building2 }, { label: "Available", value: records.filter((x) => x.status === "Available").length, icon: MapPin }, { label: "Combined Capacity", value: records.reduce((sum, x) => sum + x.capacity, 0).toLocaleString(), icon: Users }, { label: "Events Hosted", value: records.reduce((sum, x) => sum + x.events, 0), icon: CalendarDays }]} />
-    <DataTable data={records} columns={columns} getRowId={(row) => row.id} searchPlaceholder="Search venue or location..." />
-    <ConfirmDialog open={Boolean(removeId)} onOpenChange={(open) => { if (!open) setRemoveId(undefined); }} title="Delete venue?" description="This removes the venue from the local frontend dataset." actionLabel="Delete" onConfirm={() => { setRecords((items) => items.filter((item) => item.id !== removeId)); setRemoveId(undefined); toast.success("Venue deleted"); }} />
-  </div>;
-}
+export function VenuesPage(){const[records,setRecords]=React.useState<Venue[]>([]);const[editing,setEditing]=React.useState<Venue>();const[removeId,setRemoveId]=React.useState<number>();const[loading,setLoading]=React.useState(true);
+const load=React.useCallback(async()=>{try{const result=await adminApi<Venue[]>("/venues");setRecords(result.data??[]);}catch(error){toast.error(error instanceof Error?error.message:"Unable to load venues");}finally{setLoading(false);}},[]);React.useEffect(()=>{const timer=window.setTimeout(()=>void load(),0);return()=>window.clearTimeout(timer);},[load]);
+const save=async(values:Record<string,string>,id?:number)=>{await adminApi(`/venues${id?`/${id}`:""}`,{method:id?"PUT":"POST",body:JSON.stringify({...values,capacity:Number(values.capacity)})});await load();};
+const columns=React.useMemo<ManagementColumn<Venue>[]>(()=>[{id:"venue",label:"Venue",accessor:r=>`${r.name} ${r.location}`,cell:r=><div><p className="font-semibold text-text-primary">{r.name}</p><p className="text-xs">{r.location}</p></div>},{id:"capacity",label:"Capacity",accessor:r=>r.capacity,cell:r=>r.capacity.toLocaleString()},{id:"events",label:"Events",accessor:r=>r.events},{id:"status",label:"Availability",accessor:r=>r.status,cell:r=><StatusBadge status={r.status}/>},{id:"contact",label:"Contact",accessor:r=>r.contact??"—"},{id:"actions",label:"",accessor:r=>r.id,sortable:false,className:"text-right",cell:r=><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm"><MoreHorizontal/></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={()=>setEditing(r)}><Pencil/> Edit</DropdownMenuItem><DropdownMenuItem variant="destructive" onSelect={()=>setRemoveId(r.id)}><Trash2/> Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu>}],[]);
+return <div className="mx-auto max-w-[1600px] space-y-5 p-4 sm:p-6"><PageHeader title="Venues" description="Manage locations, capacity and event availability." actions={<FormDialog trigger={<Button><Plus/> Add Venue</Button>} title="Add venue" description="Create a venue for future events." fields={fields} initialValues={{status:"Available"}} submitLabel="Save venue" successMessage="Venue created" onSave={v=>save(v)}/>}/><StatCards items={[{label:"Total Venues",value:records.length,icon:Building2},{label:"Available",value:records.filter(x=>x.status==="Available").length,icon:MapPin},{label:"Combined Capacity",value:records.reduce((s,x)=>s+x.capacity,0).toLocaleString(),icon:Users},{label:"Events Hosted",value:records.reduce((s,x)=>s+Number(x.events),0),icon:CalendarDays}]}/>{loading?<Loading/>:<DataTable data={records} columns={columns} getRowId={r=>String(r.id)} searchPlaceholder="Search venue or location..."/>}{editing&&<FormDialog key={editing.id} open onOpenChange={o=>{if(!o)setEditing(undefined);}} title="Edit venue" description="Update venue details." fields={fields} initialValues={{name:editing.name,location:editing.location,capacity:String(editing.capacity),contact:editing.contact??"",status:editing.status,description:editing.description??""}} submitLabel="Save changes" successMessage="Venue updated" onSave={v=>save(v,editing.id)}/>}<ConfirmDialog open={Boolean(removeId)} onOpenChange={o=>{if(!o)setRemoveId(undefined);}} title="Delete venue?" description="The venue will be archived without deleting historical event data." actionLabel="Delete" onConfirm={()=>void(async()=>{try{await adminApi(`/venues/${removeId}`,{method:"DELETE"});toast.success("Venue deleted");setRemoveId(undefined);await load();}catch(e){toast.error(e instanceof Error?e.message:"Unable to delete venue");}})()}/></div>}
+function Loading(){return <div className="rounded-xl bg-surface p-10 text-center text-sm text-text-secondary ring-1 ring-foreground/10">Loading venues...</div>}

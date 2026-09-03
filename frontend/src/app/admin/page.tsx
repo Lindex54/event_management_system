@@ -1,12 +1,5 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { AdminDashboard } from "@/components/admin/admin-dashboard";
-
-export const metadata: Metadata = {
-  title: "Administrator Dashboard | Evently",
-  description: "Monitor events, registrations, organizers and platform activity.",
-};
-
-export default function AdminDashboardPage() {
-  return <AdminDashboard />;
+export default function AdminEntryPage() {
+  redirect("/admin/dashboard");
 }

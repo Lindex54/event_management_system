@@ -20,6 +20,9 @@ dist/
 build/
 **/build/
 
+# Runtime event image uploads
+/backend/uploads/
+
 # Generated / locally imported database schema
 /backend/database/event_management_system.sql
 

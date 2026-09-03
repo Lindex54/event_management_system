@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 const navigation = [
   {
     label: "",
-    items: [{ label: "Dashboard", href: "/admin", icon: LayoutDashboard }],
+    items: [{ label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard }],
   },
   {
     label: "Event Management",
@@ -70,7 +70,7 @@ const navigation = [
 
 export function AdminBrand() {
   return (
-    <Link href="/admin" className="flex items-center gap-2.5" aria-label="Evently admin dashboard">
+    <Link href="/admin/dashboard" className="flex items-center gap-2.5" aria-label="Evently admin dashboard">
       <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
         <CalendarDays className="size-5" aria-hidden="true" />
       </span>
@@ -106,7 +106,7 @@ export function AdminSidebar({ className, onNavigate }: { className?: string; on
             <div className="space-y-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const active = item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
+                const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                 return (
                   <Link
                     key={item.label}

@@ -1,0 +1,5 @@
+import type { RequestHandler } from "express";
+import { databaseErrorCode } from "../config/database";
+import { getUserSession } from "../services/auth.service";
+import { readCookie,userSessionCookieName } from "../utils/cookies";
+export const requireOrganizer:RequestHandler=async(request,response,next)=>{const token=readCookie(request.headers.cookie,userSessionCookieName);if(!token){response.status(401).json({success:false,message:"Organizer sign in is required"});return;}try{const user=await getUserSession(token);if(!user){response.status(401).json({success:false,message:"Organizer session is invalid or expired"});return;}if(!user.roles.includes("event-organizer")||!user.organizerId){response.status(403).json({success:false,message:"An active Event Organizer account is required"});return;}response.locals.organizer={userId:user.id,organizerId:user.organizerId,name:user.name,email:user.email,organization:user.organization};next();}catch(error){console.error(`Organizer authorization failed (${databaseErrorCode(error)})`);response.status(503).json({success:false,message:"Unable to verify organizer access"});}};

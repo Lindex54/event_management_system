@@ -1,55 +1,109 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
+import { format } from "date-fns";
 import { ImagePlus, X } from "lucide-react";
 import { toast } from "sonner";
-
 import { CalendarWithTime } from "@/components/admin/shared/calendar-with-time";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { adminApi } from "@/lib/admin-api";
 
-export function CreateEventDialog({ trigger }: { trigger: React.ReactNode }) {
-  const [open, setOpen] = React.useState(false);
-  const [date, setDate] = React.useState<Date>();
-  const [startTime, setStartTime] = React.useState("");
-  const [endTime, setEndTime] = React.useState("");
-  const [timezone, setTimezone] = React.useState("Africa/Nairobi");
-  const [status, setStatus] = React.useState("Draft");
-  const [error, setError] = React.useState("");
-  const [imageName, setImageName] = React.useState("");
-  const [imagePreview, setImagePreview] = React.useState("");
+export type EventEditorRecord = {
+  id: number; name: string; organizerId: number; venueId: number; theme?: string | null; description?: string | null;
+  date: string; time?: string | null; endTime?: string | null; timezone: string; capacity: number; status: string;
+  imageUrl?: string | null; imageAlt?: string | null;
+};
+type SelectOption = { id: number; name?: string; organization?: string };
 
-  function selectImage(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpenChange, onSaved }: {
+  trigger?: React.ReactNode; event?: EventEditorRecord; open?: boolean; onOpenChange?: (open: boolean) => void; onSaved?: () => void | Promise<void>;
+}) {
+  const [internalOpen, setInternalOpen] = React.useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const changeOpen = (next: boolean) => { setInternalOpen(next); onOpenChange?.(next); };
+  const [organizers, setOrganizers] = React.useState<SelectOption[]>([]);
+  const [venues, setVenues] = React.useState<SelectOption[]>([]);
+  const [name, setName] = React.useState(event?.name ?? ""); const [organizerId, setOrganizerId] = React.useState(event ? String(event.organizerId) : ""); const [venueId, setVenueId] = React.useState(event ? String(event.venueId) : "");
+  const [theme, setTheme] = React.useState(event?.theme ?? ""); const [description, setDescription] = React.useState(event?.description ?? ""); const [capacity, setCapacity] = React.useState(event ? String(event.capacity) : "");
+  const [date, setDate] = React.useState<Date | undefined>(event?.date ? new Date(`${event.date.slice(0, 10)}T00:00:00`) : undefined); const [startTime, setStartTime] = React.useState(event?.time ?? ""); const [endTime, setEndTime] = React.useState(event?.endTime ?? "");
+  const [timezone, setTimezone] = React.useState(event?.timezone ?? "Africa/Nairobi"); const [status, setStatus] = React.useState(event?.status ?? "Draft");
+  const [imageUrl, setImageUrl] = React.useState(event?.imageUrl ?? ""); const [imageAlt, setImageAlt] = React.useState(event?.imageAlt ?? "");
+  const [imageFile, setImageFile] = React.useState<File>(); const [imagePreview, setImagePreview] = React.useState("");
+  const [error, setError] = React.useState(""); const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!open) return;
+    void Promise.all([adminApi<SelectOption[]>("/organizers"), adminApi<SelectOption[]>("/venues")]).then(([organizerResult, venueResult]) => {
+      setOrganizers(organizerResult.data ?? []); setVenues(venueResult.data ?? []);
+    }).catch((reason) => setError(reason instanceof Error ? reason.message : "Unable to load organizers and venues"));
+  }, [open, event]);
+
+  async function selectImage(inputEvent: React.ChangeEvent<HTMLInputElement>) {
+    const file = inputEvent.target.files?.[0];
     if (!file) return;
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
-    setImageName(file.name);
-    setImagePreview(URL.createObjectURL(file));
-  }
-
-  function removeImage() {
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
-    setImageName("");
-    setImagePreview("");
-  }
-
-  function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    if (!form.get("name") || !form.get("organizer") || !form.get("venue") || !date) {
-      setError("Event name, organizer, venue and date are required.");
-      return;
+    try {
+      setError("");
+      setImagePreview(await validateImage(file));
+      setImageFile(file);
+    } catch (reason) {
+      setImageFile(undefined); setImagePreview(""); inputEvent.target.value = "";
+      setError(reason instanceof Error ? reason.message : "Unable to use the selected image");
     }
-    setError("");
-    setOpen(false);
-    toast.success("Event created", {
-      description: `Scheduled in ${timezone}${startTime ? ` at ${startTime}` : ""}.`,
-    });
   }
 
-  return <Dialog open={open} onOpenChange={setOpen}><DialogTrigger asChild>{trigger}</DialogTrigger><DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-3xl"><DialogHeader><DialogTitle className="text-lg">Create Event</DialogTitle><DialogDescription>Add the event details, date and optional time information.</DialogDescription></DialogHeader><form onSubmit={submit} className="space-y-5"><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2 sm:col-span-2"><Label htmlFor="event-name">Event Name *</Label><Input id="event-name" name="name" placeholder="e.g. Innovation Summit 2026" /></div><div className="space-y-2"><Label htmlFor="event-organizer">Organizer *</Label><Input id="event-organizer" name="organizer" placeholder="Organizer or organization" /></div><div className="space-y-2"><Label htmlFor="event-venue">Venue *</Label><Input id="event-venue" name="venue" placeholder="Event venue" /></div><div className="space-y-2"><Label htmlFor="event-theme">Event Theme (Optional)</Label><Input id="event-theme" name="theme" placeholder="e.g. Innovation for everyone" /></div><div className="space-y-2"><Label>Status *</Label><Select value={status} onValueChange={setStatus}><SelectTrigger className="h-10 w-full"><SelectValue /></SelectTrigger><SelectContent>{["Draft", "Upcoming", "Active"].map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label htmlFor="event-image">Event Image (Optional)</Label><input id="event-image" type="file" accept="image/*" onChange={selectImage} className="sr-only" /><label htmlFor="event-image" className="flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-input bg-background px-3 text-sm text-text-secondary transition-colors hover:border-primary hover:text-primary"><ImagePlus className="size-4" /><span className="truncate">{imageName || "Choose event image"}</span></label></div>{imagePreview && <div className="relative aspect-[16/7] overflow-hidden rounded-lg border border-border sm:col-span-2"><Image src={imagePreview} alt="Selected event preview" fill unoptimized className="object-cover" /><Button type="button" variant="secondary" size="icon-sm" onClick={removeImage} className="absolute top-2 right-2" aria-label="Remove event image"><X /></Button></div>}</div><div><Label className="mb-2 block">Event Date *</Label><CalendarWithTime date={date} onDateChange={setDate} startTime={startTime} onStartTimeChange={setStartTime} endTime={endTime} onEndTimeChange={setEndTime} timezone={timezone} onTimezoneChange={setTimezone} /></div>{error && <p className="text-sm text-danger" role="alert">{error}</p>}<DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit">Create Event</Button></DialogFooter></form></DialogContent></Dialog>;
+  async function submit(formEvent: React.FormEvent<HTMLFormElement>) {
+    formEvent.preventDefault();
+    if (!name.trim() || !organizerId || !venueId || !date || !Number(capacity)) { setError("Event name, organizer, venue, date and a positive capacity are required."); return; }
+    if (startTime && endTime && endTime <= startTime) { setError("End time must be later than start time."); return; }
+    setSaving(true); setError("");
+    try {
+      let savedImageUrl = imageUrl.trim();
+      if (imageFile) {
+        const upload = await adminApi<{ imageUrl: string }>("/uploads/event-image", {
+          method: "POST",
+          body: JSON.stringify({ dataUrl: await readAsDataUrl(imageFile), originalName: imageFile.name }),
+        });
+        savedImageUrl = upload.data?.imageUrl ?? "";
+        if (!savedImageUrl) throw new Error("The server did not return the uploaded image path");
+      }
+      await adminApi(`/events${event ? `/${event.id}` : ""}`, { method: event ? "PUT" : "POST", body: JSON.stringify({
+        name: name.trim(), organizerId: Number(organizerId), venueId: Number(venueId), theme, description,
+        date: format(date, "yyyy-MM-dd"), startTime: startTime || null, endTime: endTime || null, timezone,
+        capacity: Number(capacity), status, imageUrl: savedImageUrl, imageAlt,
+      }) });
+      toast.success(event ? "Event updated" : "Event created"); await onSaved?.(); changeOpen(false);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to save event"); }
+    finally { setSaving(false); }
+  }
+
+  return <Dialog open={open} onOpenChange={changeOpen}>{trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}<DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-3xl"><DialogHeader><DialogTitle className="text-lg">{event ? "Edit Event" : "Create Event"}</DialogTitle><DialogDescription>Add the event details, date and optional time information.</DialogDescription></DialogHeader><form onSubmit={submit} className="space-y-5"><div className="grid gap-4 sm:grid-cols-2">
+    <Field label="Event Name *" id="event-name" span><Input id="event-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Innovation Summit 2026" /></Field>
+    <Field label="Organizer *" id="event-organizer"><Select value={organizerId} onValueChange={setOrganizerId}><SelectTrigger id="event-organizer" className="h-10 w-full"><SelectValue placeholder="Select organizer" /></SelectTrigger><SelectContent>{organizers.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.organization ?? item.name}</SelectItem>)}</SelectContent></Select></Field>
+    <Field label="Venue *" id="event-venue"><Select value={venueId} onValueChange={setVenueId}><SelectTrigger id="event-venue" className="h-10 w-full"><SelectValue placeholder="Select venue" /></SelectTrigger><SelectContent>{venues.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></Field>
+    <Field label="Event Theme (Optional)" id="event-theme"><Input id="event-theme" value={theme} onChange={(e) => setTheme(e.target.value)} placeholder="e.g. Innovation for everyone" /></Field>
+    <Field label="Capacity *" id="event-capacity"><Input id="event-capacity" type="number" min="1" value={capacity} onChange={(e) => setCapacity(e.target.value)} placeholder="e.g. 250" /></Field>
+    <Field label="Status *" id="event-status"><Select value={status} onValueChange={setStatus}><SelectTrigger id="event-status" className="h-10 w-full"><SelectValue /></SelectTrigger><SelectContent>{["Draft", "Upcoming", "Active", "Completed", "Cancelled"].map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></Field>
+    <Field label="Upload Event Image (Optional)" id="event-image-file" span><input id="event-image-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" onChange={(inputEvent) => void selectImage(inputEvent)} /><label htmlFor="event-image-file" className="flex min-h-20 cursor-pointer items-center justify-center gap-3 rounded-xl border border-dashed border-input bg-background px-4 text-sm text-text-secondary transition-colors hover:border-primary hover:text-primary"><ImagePlus className="size-5" /><span>{imageFile ? imageFile.name : "Choose an image from your device (JPG, PNG, WebP or GIF; maximum 5 MB)"}</span></label>{imagePreview && <div className="relative h-44 overflow-hidden rounded-xl border border-border bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(imagePreview)})` }}><Button type="button" variant="secondary" size="icon-sm" className="absolute right-2 top-2" onClick={() => { setImageFile(undefined); setImagePreview(""); }} aria-label="Remove selected image"><X /></Button></div>}<p className="text-xs text-text-secondary">A device image takes priority over the URL below.</p></Field>
+    <Field label="Event Image URL (Optional)" id="event-image"><Input id="event-image" type="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://example.com/event.jpg" /></Field>
+    <Field label="Image Description (Optional)" id="event-image-alt"><Input id="event-image-alt" value={imageAlt} onChange={(e) => setImageAlt(e.target.value)} placeholder="Describe the event image" /></Field>
+    <Field label="Description (Optional)" id="event-description" span><Textarea id="event-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Tell attendees what to expect" /></Field>
+  </div><div><Label className="mb-2 block">Event Date *</Label><CalendarWithTime date={date} onDateChange={setDate} startTime={startTime} onStartTimeChange={setStartTime} endTime={endTime} onEndTimeChange={setEndTime} timezone={timezone} onTimezoneChange={setTimezone} /></div>{error && <p className="text-sm text-danger" role="alert">{error}</p>}<DialogFooter><Button type="button" variant="outline" onClick={() => changeOpen(false)} disabled={saving}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving…" : event ? "Save Changes" : "Create Event"}</Button></DialogFooter></form></DialogContent></Dialog>;
+}
+
+function Field({ label, id, span, children }: { label: string; id: string; span?: boolean; children: React.ReactNode }) { return <div className={`space-y-2${span ? " sm:col-span-2" : ""}`}><Label htmlFor={id}>{label}</Label>{children}</div>; }
+
+async function readAsDataUrl(file: File): Promise<string> {
+  return await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error("Unable to read the selected image")); reader.readAsDataURL(file); });
+}
+
+async function validateImage(file: File): Promise<string> {
+  const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+  if (!allowed.includes(file.type)) throw new Error("Choose a JPG, PNG, WebP, or GIF image");
+  if (file.size > 5 * 1024 * 1024) throw new Error("The event image must be smaller than 5 MB");
+  return await readAsDataUrl(file);
 }

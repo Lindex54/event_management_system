@@ -52,10 +52,10 @@ export function PublicHeader() {
         <div className="hidden items-center gap-2 md:flex">
           <ModeToggle />
           <Button variant="ghost" asChild>
-            <Link href="#sign-in">Sign In</Link>
+            <Link href="/login">Sign In</Link>
           </Button>
           <Button className="bg-primary hover:bg-primary-dark" asChild>
-            <Link href="#create-account">Create Account</Link>
+            <Link href="/signup">Create Account</Link>
           </Button>
         </div>
 
@@ -91,12 +91,12 @@ export function PublicHeader() {
               <div className="mt-auto grid gap-2 border-t border-border p-4">
                 <SheetClose asChild>
                   <Button variant="outline" asChild>
-                    <Link href="#sign-in">Sign In</Link>
+                    <Link href="/login">Sign In</Link>
                   </Button>
                 </SheetClose>
                 <SheetClose asChild>
                   <Button className="bg-primary hover:bg-primary-dark" asChild>
-                    <Link href="#create-account">Create Account</Link>
+                    <Link href="/signup">Create Account</Link>
                   </Button>
                 </SheetClose>
               </div>
