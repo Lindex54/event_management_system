@@ -1,5 +1,5 @@
-import { DiscussionsPage } from "@/components/admin/discussions/discussions-page";
+import { DiscussionListPage } from "@/components/discussions/discussion-list-page";
 
 export default function Page() {
-  return <DiscussionsPage />;
+  return <DiscussionListPage basePath="/admin/discussions" />;
 }

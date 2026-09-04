@@ -15,8 +15,9 @@ const invitableRoles = new Set(["System Administrator", "Event Staff"]);
 
 const selectUsers = `SELECT u.id,u.username,CONCAT_WS(' ',p.first_name,p.last_name) AS name,p.first_name AS firstName,p.last_name AS lastName,p.email,p.telephone,
   GROUP_CONCAT(DISTINCT r.name ORDER BY r.name SEPARATOR ', ') AS role,u.status,DATE_FORMAT(u.created_at,'%b %e, %Y') AS joined,
-  DATE_FORMAT(u.last_active_at,'%b %e, %Y') AS lastActive,
-  EXISTS(SELECT 1 FROM account_setup_tokens t WHERE t.user_id=u.id AND t.used_at IS NULL AND t.expires_at>CURRENT_TIMESTAMP) AS setupPending
+  DATE_FORMAT(u.last_active_at,'%b %e, %Y') AS lastActive,(u.locked_at IS NOT NULL) AS locked,
+  EXISTS(SELECT 1 FROM account_setup_tokens t WHERE t.user_id=u.id AND t.used_at IS NULL AND t.expires_at>CURRENT_TIMESTAMP) AS setupPending,
+  EXISTS(SELECT 1 FROM account_setup_tokens t WHERE t.user_id=u.id AND t.used_at IS NOT NULL) AS setupCompleted
   FROM users u JOIN people p ON p.id=u.person_id JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id
   WHERE u.deleted_at IS NULL GROUP BY u.id,p.id ORDER BY u.created_at DESC`;
 
@@ -77,6 +78,39 @@ router.post("/", async (request, response) => {
   } finally {
     connection.release();
   }
+});
+
+router.post("/:id/resend-invite", async (request, response) => {
+  const id = positiveId(request.params.id);
+  if (!id) { response.status(400).json({ success: false, message: "Valid user ID is required" }); return; }
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT CONCAT_WS(' ',p.first_name,p.last_name) AS name,p.email,r.slug AS roleSlug
+       FROM users u JOIN people p ON p.id=u.person_id JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id
+       WHERE u.id=? AND u.deleted_at IS NULL LIMIT 1`,
+      [id],
+    );
+    const account = rows[0];
+    if (!account) { response.status(404).json({ success: false, message: "User not found" }); return; }
+    const token = await createSetupToken(id, response.locals.administrator.id);
+    try {
+      await sendInvitationEmail({ to: account.email, name: account.name, roleName: formatRoleName(account.roleSlug), token });
+      response.json({ success: true, message: `A new setup link was sent to ${account.email}` });
+    } catch (mailError) {
+      console.error("Resend invitation email failed to send", mailError);
+      response.status(502).json({ success: false, message: "A new link was generated, but the email could not be sent. Try again shortly." });
+    }
+  } catch (error) { sendDatabaseError(response, error, "Resend invitation"); }
+});
+
+router.post("/:id/unlock", async (request, response) => {
+  const id = positiveId(request.params.id);
+  if (!id) { response.status(400).json({ success: false, message: "Valid user ID is required" }); return; }
+  try {
+    const [result] = await pool.execute<ResultSetHeader>("UPDATE users SET failed_login_attempts=0,locked_at=NULL WHERE id=? AND deleted_at IS NULL", [id]);
+    if (!result.affectedRows) { response.status(404).json({ success: false, message: "User not found" }); return; }
+    response.json({ success: true, message: "Account unlocked" });
+  } catch (error) { sendDatabaseError(response, error, "Unlock account"); }
 });
 
 router.patch("/:id/status", async (request, response) => {

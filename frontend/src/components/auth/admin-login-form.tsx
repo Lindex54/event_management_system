@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { ShieldCheck } from "lucide-react";
@@ -18,6 +19,7 @@ export function AdminLoginForm() {
   const [password, setPassword] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [errors, setErrors] = React.useState<{ username?: string; password?: string }>({});
+  const [locked, setLocked] = React.useState(false);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -27,7 +29,7 @@ export function AdminLoginForm() {
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
 
-    setLoading(true);
+    setLoading(true); setLocked(false);
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/admin/login`, {
         method: "POST",
@@ -35,8 +37,9 @@ export function AdminLoginForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: username.trim(), password }),
       });
-      const result = await response.json() as { success: boolean; message?: string };
+      const result = await response.json() as { success: boolean; message?: string; locked?: boolean };
       if (!response.ok || !result.success) {
+        if (result.locked) { setLocked(true); return; }
         setErrors({ password: result.message ?? "Invalid administrator credentials." });
         return;
       }
@@ -87,6 +90,17 @@ export function AdminLoginForm() {
           placeholder="Enter your password"
           error={errors.password}
         />
+
+        <div className="text-right">
+          <Link href="/forgot-password" className="text-sm font-semibold text-primary hover:underline">Forgot password?</Link>
+        </div>
+
+        {locked && (
+          <div className="rounded-lg bg-danger/10 p-3 text-sm text-danger" role="alert">
+            Too many failed attempts. Your account is locked.{" "}
+            <Link href="/forgot-password" className="font-semibold underline">Reset your password</Link> to sign in again.
+          </div>
+        )}
 
         <Button type="submit" disabled={loading} className="h-11 w-full bg-primary font-semibold hover:bg-primary-dark">
           {loading ? "Signing in..." : "Sign In as Administrator"}

@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 "use client";
-import * as React from "react";import { useSearchParams } from "next/navigation";import { MoreHorizontal,UserCheck,UserRoundSearch } from "lucide-react";import { toast } from "sonner";import { DataTable,type ManagementColumn } from "@/components/admin/shared/data-table";import { PageHeader } from "@/components/admin/shared/page-header";import { StatusBadge } from "@/components/admin/shared/status-badge";import { Button } from "@/components/ui/button";import { Dialog,DialogContent,DialogDescription,DialogFooter,DialogHeader,DialogTitle } from "@/components/ui/dialog";import { DropdownMenu,DropdownMenuContent,DropdownMenuItem,DropdownMenuTrigger } from "@/components/ui/dropdown-menu";import { Select,SelectContent,SelectItem,SelectTrigger,SelectValue } from "@/components/ui/select";import { staffApi } from "@/lib/api/staff";
+import * as React from "react";import { useSearchParams } from "next/navigation";import { CheckCircle2,MoreHorizontal,UserCheck,UserRoundSearch } from "lucide-react";import { toast } from "sonner";import { DataTable,type ManagementColumn } from "@/components/admin/shared/data-table";import { PageHeader } from "@/components/admin/shared/page-header";import { StatusBadge } from "@/components/admin/shared/status-badge";import { Button } from "@/components/ui/button";import { Dialog,DialogContent,DialogDescription,DialogFooter,DialogHeader,DialogTitle } from "@/components/ui/dialog";import { DropdownMenu,DropdownMenuContent,DropdownMenuItem,DropdownMenuTrigger } from "@/components/ui/dropdown-menu";import { Select,SelectContent,SelectItem,SelectTrigger,SelectValue } from "@/components/ui/select";import { staffApi } from "@/lib/api/staff";
 
 interface StaffEvent{id:number;name:string;}
 interface StaffAttendee{id:number;referenceCode:string;attendee:string;email:string;eventId:number;event:string;status:"Confirmed"|"Pending"|"Cancelled";checkInStatus:"Checked In"|"Not Checked In";checkedInAt:string|null;}
@@ -38,6 +38,15 @@ export function StaffAttendeesPage(){
     finally{ setCheckingInId(null); }
   }
 
+  async function confirmRegistration(registration:StaffAttendee){
+    try{
+      await staffApi(`/registrations/${registration.id}/status`,{method:"PATCH",body:JSON.stringify({status:"Confirmed"})});
+      toast.success("Registration confirmed");
+      setRecords(current=>current.map(r=>r.id===registration.id?{...r,status:"Confirmed"}:r));
+      setSelected(current=>current&&current.id===registration.id?{...current,status:"Confirmed"}:current);
+    }catch(e){ toast.error(e instanceof Error?e.message:"Unable to confirm registration"); }
+  }
+
   const columns=React.useMemo<ManagementColumn<StaffAttendee>[]>(()=>[
     {id:"attendee",label:"Attendee",accessor:r=>`${r.attendee} ${r.email}`,cell:r=><div><p className="font-semibold text-text-primary">{r.attendee}</p><p className="text-xs text-text-secondary">{r.email}</p></div>},
     {id:"event",label:"Event",accessor:r=>r.event},
@@ -49,6 +58,7 @@ export function StaffAttendeesPage(){
         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm"><MoreHorizontal/></Button></DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={()=>setSelected(r)}><UserRoundSearch/> View Registration</DropdownMenuItem>
+          <DropdownMenuItem disabled={r.status==="Confirmed"} onSelect={()=>void confirmRegistration(r)}><CheckCircle2/> Confirm</DropdownMenuItem>
           <DropdownMenuItem disabled={r.checkInStatus==="Checked In"||r.status!=="Confirmed"} onSelect={()=>void checkIn(r)}><UserCheck/> Check In</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -89,6 +99,9 @@ export function StaffAttendeesPage(){
                 <div className="flex justify-between"><span className="text-text-secondary">Check-in Status</span><StatusBadge status={selected.checkInStatus}/></div>
               </div>
               <DialogFooter>
+                <Button variant="outline" disabled={selected.status==="Confirmed"} onClick={()=>void confirmRegistration(selected)}>
+                  <CheckCircle2/> Confirm
+                </Button>
                 <Button disabled={selected.checkInStatus==="Checked In"||selected.status!=="Confirmed"||checkingInId===selected.id} onClick={()=>void checkIn(selected)}>
                   <UserCheck/>{selected.checkInStatus==="Checked In"?"Already Checked In":"Check In"}
                 </Button>

@@ -8,6 +8,7 @@ import { AgendaSection } from "@/components/events/agenda-section";
 import { RegisterAction } from "@/components/events/register-action";
 import { PublicFooter } from "@/components/layout/public-footer";
 import { PublicHeader } from "@/components/layout/public-header";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getPublicEvent } from "@/lib/api/public-events";
@@ -48,6 +49,9 @@ export default async function EventDetailPage({ params }: { params: Promise<{ sl
               {event.theme && <p className="text-sm font-semibold tracking-[0.1em] text-primary uppercase">{event.theme}</p>}
               <h1 className="mt-2 text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">{event.name}</h1>
               <p className="mt-2 text-sm text-text-secondary">Organized by <span className="font-semibold text-text-primary">{event.organizer}</span></p>
+              {event.coOrganizers.length > 0 && (
+                <p className="mt-1 text-sm text-text-secondary">Co-organized by <span className="font-medium text-text-primary">{event.coOrganizers.map((c) => c.name).join(", ")}</span></p>
+              )}
             </div>
 
             {event.description && (
@@ -55,6 +59,29 @@ export default async function EventDetailPage({ params }: { params: Promise<{ sl
             )}
 
             <AgendaSection event={event} />
+
+            {event.speakers.length > 0 && (
+              <Card className="shadow-none">
+                <CardContent className="space-y-4 p-6">
+                  <h2 className="text-lg font-semibold text-text-primary">Speakers &amp; Guests</h2>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {event.speakers.map((speaker, index) => (
+                      <div key={index} className="flex items-start gap-3">
+                        <Avatar className="size-11 shrink-0">
+                          <AvatarImage src={speaker.photoUrl ?? undefined} alt={speaker.name} />
+                          <AvatarFallback className="bg-primary/10 font-semibold text-primary">{speaker.name.split(" ").map((part) => part[0]).slice(0, 2).join("").toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-text-primary">{speaker.name}</p>
+                          <p className="text-xs text-text-secondary">{speaker.title}{speaker.organization ? ` · ${speaker.organization}` : ""}</p>
+                          {speaker.bio && <p className="mt-1.5 line-clamp-3 text-xs leading-5 text-text-secondary">{speaker.bio}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {event.schedule.length > 0 && (
               <Card className="shadow-none">
@@ -85,7 +112,11 @@ export default async function EventDetailPage({ params }: { params: Promise<{ sl
                   <p className="flex items-center gap-2.5"><Users className="size-4 shrink-0 text-primary" />{event.registrations} / {event.capacity} registered</p>
                   {event.registrationClosesAt && <p className="flex items-center gap-2.5"><CalendarClock className="size-4 shrink-0 text-primary" />Registration closes {new Date(event.registrationClosesAt).toLocaleDateString()}</p>}
                 </div>
-                <RegisterAction eventId={event.id} full={full} closed={closed} />
+                <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/50 p-3 text-sm">
+                  <span className="text-text-secondary">Registration</span>
+                  <Badge variant={closed || full ? "outline" : "default"}>{closed ? "Closed" : full ? "Full" : "Open"}</Badge>
+                </div>
+                <RegisterAction eventSlug={event.slug} eventName={event.name} full={full} closed={closed} />
               </CardContent>
             </Card>
             <Link href="/events" className="block text-center text-sm font-semibold text-primary hover:underline">← Back to all events</Link>

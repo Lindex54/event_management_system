@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   ArrowUpDown,
   Copy,
@@ -39,10 +40,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { adminEvents } from "@/data/admin-dashboard";
-import type { AdminEvent } from "@/types/admin";
+import type { DashboardUpcomingEvent } from "@/types/admin";
 
-const statusStyles = {
+const statusStyles: Record<string, string> = {
   Draft: "border-border bg-muted text-text-secondary",
   Upcoming: "border-primary/20 bg-primary/10 text-primary",
   Active: "border-success/20 bg-success/10 text-success",
@@ -60,18 +60,18 @@ const features = tableFeatures({
   sortFns: { alphanumeric: sortFn_alphanumeric },
 });
 
-const columnHelper = createColumnHelper<typeof features, AdminEvent>();
+const columnHelper = createColumnHelper<typeof features, DashboardUpcomingEvent>();
 
-async function copyRegistrationLink(event: AdminEvent) {
+async function copyRegistrationLink(event: DashboardUpcomingEvent) {
   try {
-    await navigator.clipboard.writeText(event.registrationUrl);
+    await navigator.clipboard.writeText(`${window.location.origin}/events/${event.slug}`);
     toast.success("Registration link copied", { description: event.name });
   } catch {
     toast.error("Could not copy the registration link");
   }
 }
 
-export function UpcomingEventsTable() {
+export function UpcomingEventsTable({ events }: { events: DashboardUpcomingEvent[] }) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [filter, setFilter] = React.useState("");
   const [inviteEventId, setInviteEventId] = React.useState<string>();
@@ -82,7 +82,7 @@ export function UpcomingEventsTable() {
       cell: ({ row }) => (
         <div className="max-w-60 whitespace-normal">
           <p className="font-semibold text-text-primary">{row.original.name}</p>
-          <p className="mt-0.5 text-xs text-text-secondary">{row.original.id}</p>
+          <p className="mt-0.5 text-xs text-text-secondary">{row.original.slug}</p>
         </div>
       ),
     }),
@@ -96,7 +96,7 @@ export function UpcomingEventsTable() {
       cell: ({ row }) => row.original.dateLabel,
       sortFn: "alphanumeric",
     }),
-    columnHelper.accessor("venue", { header: "Venue" }),
+    columnHelper.accessor("venue", { header: "Venue", cell: ({ row }) => row.original.venue ?? "Not set" }),
     columnHelper.accessor("registrations", {
       header: "Registrations",
       cell: ({ row }) => (
@@ -122,14 +122,14 @@ export function UpcomingEventsTable() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem><Eye /> View event</DropdownMenuItem>
-              <DropdownMenuItem><Pencil /> Edit event</DropdownMenuItem>
-              <DropdownMenuItem><Users /> View registrations</DropdownMenuItem>
+              <DropdownMenuItem asChild><a href={`/events/${row.original.slug}`} target="_blank" rel="noreferrer"><Eye /> View event</a></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href={`/admin/events/${row.original.id}`}><Pencil /> Edit event</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="/admin/registrations"><Users /> View registrations</Link></DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => void copyRegistrationLink(row.original)}>
                 <Copy /> Copy registration link
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setInviteEventId(row.original.id)}>
+              <DropdownMenuItem onSelect={() => setInviteEventId(String(row.original.id))}>
                 <Send /> Invite people
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -141,7 +141,7 @@ export function UpcomingEventsTable() {
 
   const table = useTable({
     features,
-    data: adminEvents,
+    data: events,
     columns,
     state: { sorting, globalFilter: filter },
     onSortingChange: setSorting,
@@ -163,30 +163,32 @@ export function UpcomingEventsTable() {
           </div>
         </CardHeader>
         <CardContent className="px-0">
-          <Table className="min-w-[980px]">
-            <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="bg-muted/40 hover:bg-muted/40">
-                  {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} className="px-4 text-xs text-text-secondary">
-                      {header.isPlaceholder ? null : <table.FlexRender header={header} />}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getAllCells().map((cell) => (
-                    <TableCell key={cell.id} className="px-4 py-3.5 text-text-secondary">
-                      <table.FlexRender cell={cell} />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          {events.length ? (
+            <Table className="min-w-[980px]">
+              <TableHeader>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id} className="bg-muted/40 hover:bg-muted/40">
+                    {headerGroup.headers.map((header) => (
+                      <TableHead key={header.id} className="px-4 text-xs text-text-secondary">
+                        {header.isPlaceholder ? null : <table.FlexRender header={header} />}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableHeader>
+              <TableBody>
+                {table.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id}>
+                    {row.getAllCells().map((cell) => (
+                      <TableCell key={cell.id} className="px-4 py-3.5 text-text-secondary">
+                        <table.FlexRender cell={cell} />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : <p className="p-8 text-center text-sm text-text-secondary">No upcoming events right now.</p>}
         </CardContent>
       </Card>
       <InvitePeopleDialog

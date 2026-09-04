@@ -1,20 +1,17 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import type { ApexOptions } from "apexcharts";
 import { useTheme } from "next-themes";
 
+import { ClientApexChart } from "@/components/charts/client-apex-chart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { eventStatusData } from "@/data/admin-dashboard";
 
-const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
-
-export function EventStatusChart() {
+export function EventStatusChart({ distribution, total }: { distribution: { label: string; value: number }[]; total: number }) {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const options: ApexOptions = {
     chart: { fontFamily: "var(--font-plus-jakarta-sans)" },
-    labels: eventStatusData.map((item) => item.label),
+    labels: distribution.map((item) => item.label),
     colors: ["#2563EB", "#16A34A", "#64748B", "#DC2626"],
     dataLabels: { enabled: false },
     legend: {
@@ -33,7 +30,7 @@ export function EventStatusChart() {
               show: true,
               label: "All events",
               color: dark ? "#94A3B8" : "#64748B",
-              formatter: () => "148",
+              formatter: () => total.toLocaleString(),
             },
             value: {
               color: dark ? "#F8FAFC" : "#111827",
@@ -54,7 +51,7 @@ export function EventStatusChart() {
         <CardDescription>Current event distribution</CardDescription>
       </CardHeader>
       <CardContent className="min-w-0">
-        <Chart options={options} series={eventStatusData.map((item) => item.value)} type="donut" height={290} width="100%" />
+        <ClientApexChart options={options} series={distribution.map((item) => item.value)} type="donut" height={290} />
       </CardContent>
     </Card>
   );

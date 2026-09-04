@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";import Link from "next/link";import { Bell,CalendarCheck2,CalendarDays,Clock,Compass,MapPin,Ticket,TicketCheck } from "lucide-react";import { toast } from "sonner";import { PageHeader } from "@/components/admin/shared/page-header";import { StatCards } from "@/components/admin/shared/stat-cards";import { StatusBadge } from "@/components/admin/shared/status-badge";import { Badge } from "@/components/ui/badge";import { Button } from "@/components/ui/button";import { Card,CardContent } from "@/components/ui/card";import { attendeeApi } from "@/lib/api/attendee";
 
-interface RegisteredEvent{eventId:number;name:string;slug:string;dateLabel:string;time:string;venue:string|null;eventStatus:string;registrationId:number;referenceCode:string;registrationStatus:string;checkInStatus:string;}
+interface RegisteredEvent{eventId:number;name:string;slug:string;dateLabel:string;time:string;venue:string|null;eventStatus:string;registrationId:number;referenceCode:string;ticketToken:string;registrationStatus:string;checkInStatus:string;canEnterEvent:boolean|number;}
 interface Dashboard{upcomingRegistered:number;totalRegistrations:number;eventsAttended:number;pendingRegistrations:number;nextEvent:RegisteredEvent|null;upcoming:RegisteredEvent[];recent:RegisteredEvent[];}
 interface NotificationItem{id:number;title:string;message:string;isRead:boolean|number;createdAt:string;}
 
@@ -53,7 +53,7 @@ export function AttendeeDashboardPage(){
                 {data.nextEvent.venue && <span className="flex items-center gap-1"><MapPin className="size-4"/>{data.nextEvent.venue}</span>}
               </div>
             </div>
-            <Button asChild><Link href="/attendee/tickets">View Ticket</Link></Button>
+            {Boolean(data.nextEvent.canEnterEvent) ? <Button asChild><Link href={`/events/${data.nextEvent.slug}/live?ticket=${data.nextEvent.ticketToken}`}>Enter Event</Link></Button> : <Button asChild variant="outline"><Link href="/attendee/tickets">View Ticket · Check-in Required</Link></Button>}
           </CardContent>
         </Card>
       )}
@@ -70,7 +70,7 @@ export function AttendeeDashboardPage(){
                       <p className="text-sm font-semibold text-text-primary">{event.name}</p>
                       <p className="text-xs text-text-secondary">{event.dateLabel} · {event.venue??"Venue TBA"}</p>
                     </div>
-                    <StatusBadge status={event.registrationStatus}/>
+                    <div className="flex items-center gap-2"><StatusBadge status={event.checkInStatus}/>{Boolean(event.canEnterEvent) ? <Button asChild size="sm"><Link href={`/events/${event.slug}/live?ticket=${event.ticketToken}`}>Enter Event</Link></Button> : <Button size="sm" variant="outline" disabled>Check-in Required</Button>}</div>
                   </li>
                 ))}
               </ul>

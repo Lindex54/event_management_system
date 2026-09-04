@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { dashboardStats } from "@/data/admin-dashboard";
+import type { DashboardStats } from "@/types/admin";
 
 const icons = {
   events: CalendarDays,
@@ -46,10 +46,19 @@ const cardStyles = {
   },
 };
 
-export function AdminStats() {
+export function AdminStats({ stats }: { stats: DashboardStats }) {
+  const cards = [
+    { label: "Total Events", value: stats.totalEvents.toLocaleString(), change: stats.eventsThisMonth > 0 ? `+${stats.eventsThisMonth} this month` : "No new events this month", icon: "events" as const },
+    { label: "Upcoming Events", value: stats.upcomingEvents.toLocaleString(), change: "Next 30 days", icon: "upcoming" as const },
+    { label: "Total Registrations", value: stats.totalRegistrations.toLocaleString(), change: stats.registrationsChange, icon: "registrations" as const },
+    { label: "Total Attendees", value: stats.totalAttendees.toLocaleString(), change: stats.attendeesChange, icon: "attendees" as const },
+    { label: "Total Organizers", value: stats.totalOrganizers.toLocaleString(), change: stats.organizersThisMonth > 0 ? `+${stats.organizersThisMonth} this month` : "No new organizers this month", icon: "organizers" as const },
+    { label: "Events Today", value: stats.eventsToday.toLocaleString(), change: `${stats.venuesToday} venue${stats.venuesToday === 1 ? "" : "s"}`, icon: "today" as const },
+  ];
+
   return (
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6" aria-label="Dashboard statistics">
-      {dashboardStats.map((stat) => {
+      {cards.map((stat) => {
         const Icon = icons[stat.icon];
         const styles = cardStyles[stat.icon];
         return (
@@ -61,9 +70,7 @@ export function AdminStats() {
               <div className="min-w-0">
                 <p className="truncate text-xs font-medium text-text-secondary">{stat.label}</p>
                 <p className="mt-2 text-2xl font-bold tracking-tight text-text-primary">{stat.value}</p>
-                <p className={stat.trend === "up" ? "mt-1 text-xs font-medium text-success" : "mt-1 text-xs text-text-secondary"}>
-                  {stat.change}
-                </p>
+                <p className="mt-1 text-xs text-text-secondary">{stat.change}</p>
               </div>
               <span className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${styles.icon}`}>
                 <Icon className="size-[18px]" aria-hidden="true" />

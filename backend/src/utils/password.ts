@@ -19,3 +19,20 @@ export async function verifyPassword(password: string, storedHash: string): Prom
   const suppliedKey = await scryptAsync(password, salt, keyLength) as Buffer;
   return timingSafeEqual(storedKey, suppliedKey);
 }
+
+const passwordPattern = {
+  length: /.{8,}/,
+  upper: /[A-Z]/,
+  lower: /[a-z]/,
+  number: /[0-9]/,
+  special: /[^A-Za-z0-9]/,
+};
+
+export function passwordStrengthError(password: string): string | null {
+  if (!passwordPattern.length.test(password)) return "Password must be at least 8 characters long";
+  if (!passwordPattern.upper.test(password)) return "Password must contain at least one uppercase letter";
+  if (!passwordPattern.lower.test(password)) return "Password must contain at least one lowercase letter";
+  if (!passwordPattern.number.test(password)) return "Password must contain at least one number";
+  if (!passwordPattern.special.test(password)) return "Password must contain at least one special character";
+  return null;
+}

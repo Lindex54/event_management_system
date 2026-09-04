@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
 import { databaseErrorCode, pool } from "../config/database";
@@ -100,15 +101,15 @@ async function seed(): Promise<void> {
     const [existingRegistration] = await connection.query<IdRow[]>("SELECT id FROM registrations WHERE event_id = ? AND attendee_id = ?", [todayEventId, attendeeId]);
     if (!existingRegistration[0]) {
       await connection.execute(
-        "INSERT INTO registrations (reference_code, event_id, attendee_id, status) VALUES (?, ?, ?, 'Confirmed')",
-        [`REG-SEED-${attendeeId}`, todayEventId, attendeeId],
+        "INSERT INTO registrations (reference_code, ticket_token, event_id, attendee_id, status) VALUES (?, ?, ?, ?, 'Confirmed')",
+        [`REG-SEED-${attendeeId}`, randomBytes(32).toString("hex"), todayEventId, attendeeId],
       );
     }
     const [existingWalkInRegistration] = await connection.query<IdRow[]>("SELECT id FROM registrations WHERE event_id = ? AND attendee_id = ?", [todayEventId, walkInAttendeeId]);
     if (!existingWalkInRegistration[0]) {
       await connection.execute(
-        "INSERT INTO registrations (reference_code, event_id, attendee_id, status) VALUES (?, ?, ?, 'Confirmed')",
-        [`REG-SEED-${walkInAttendeeId}`, todayEventId, walkInAttendeeId],
+        "INSERT INTO registrations (reference_code, ticket_token, event_id, attendee_id, status) VALUES (?, ?, ?, ?, 'Confirmed')",
+        [`REG-SEED-${walkInAttendeeId}`, randomBytes(32).toString("hex"), todayEventId, walkInAttendeeId],
       );
     }
 

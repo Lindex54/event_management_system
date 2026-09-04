@@ -1,6 +1,7 @@
 import type { RequestHandler, Response } from "express";
 import { databaseErrorCode } from "../../config/database";
 import * as service from "../../services/attendee/attendee.service";
+import { sendExistingAttendeeConfirmation } from "../../services/participant-journey.service";
 import { optionalText, positiveId, positiveInteger, text } from "../../utils/request";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -59,6 +60,9 @@ export const registerForEvent: RequestHandler = async (req, res) => {
   if (!eventId) { res.status(400).json({ success: false, message: "Valid event ID is required" }); return; }
   try {
     const result = await service.registerForEvent(attendee(res).attendeeId, eventId);
+    if (result === "REGISTERED") {
+      void sendExistingAttendeeConfirmation(attendee(res).attendeeId, eventId).catch((mailError) => console.error("Registration confirmation email failed", mailError));
+    }
     const outcome = registerMessages[result]!;
     res.status(outcome.status).json({ success: result === "REGISTERED", message: outcome.message, data: { result } });
   } catch (error) { fail(res, error, "Register for event"); }

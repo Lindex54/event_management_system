@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 "use client";
-import * as React from "react";import Link from "next/link";import { CalendarDays,Eye,MoreHorizontal,ScanLine,Users } from "lucide-react";import { toast } from "sonner";import { DataTable,type ManagementColumn } from "@/components/admin/shared/data-table";import { PageHeader } from "@/components/admin/shared/page-header";import { StatusBadge } from "@/components/admin/shared/status-badge";import { Button } from "@/components/ui/button";import { DropdownMenu,DropdownMenuContent,DropdownMenuItem,DropdownMenuTrigger } from "@/components/ui/dropdown-menu";import { staffApi } from "@/lib/api/staff";
+import * as React from "react";import Link from "next/link";import { CalendarDays,Eye,MoreHorizontal,ScanLine,Users } from "lucide-react";import { toast } from "sonner";import { DataTable,type ManagementColumn } from "@/components/admin/shared/data-table";import { PageHeader } from "@/components/admin/shared/page-header";import { StatusBadge } from "@/components/admin/shared/status-badge";import { Button } from "@/components/ui/button";import { DropdownMenu,DropdownMenuContent,DropdownMenuItem,DropdownMenuTrigger } from "@/components/ui/dropdown-menu";import { Tabs,TabsContent,TabsList,TabsTrigger } from "@/components/ui/tabs";import { staffApi } from "@/lib/api/staff";
 
 interface StaffEvent{id:number;name:string;slug:string;date:string;dateLabel:string;time:string;endTime:string|null;status:string;venue:string|null;registrations:number;checkedIn:number;}
 
@@ -37,11 +37,26 @@ export function StaffEventsPage(){
     )},
   ],[]);
 
+  const today=new Date().toISOString().slice(0,10);
+  const upcoming=records.filter(r=>r.date>=today);
+  const past=records.filter(r=>r.date<today);
+
   return (
     <div className="mx-auto max-w-[1600px] space-y-5 p-4 sm:p-6">
       <PageHeader title="Assigned Events" description="Events you have been assigned to work." />
       {loading ? <Loading/> : error ? <ErrorState message={error}/> : records.length ? (
-        <DataTable data={records} columns={columns} getRowId={r=>String(r.id)} searchPlaceholder="Search event or venue..."/>
+        <Tabs defaultValue="upcoming">
+          <TabsList>
+            <TabsTrigger value="upcoming">Upcoming ({upcoming.length})</TabsTrigger>
+            <TabsTrigger value="past">Past ({past.length})</TabsTrigger>
+          </TabsList>
+          <TabsContent value="upcoming" className="mt-4">
+            {upcoming.length ? <DataTable data={upcoming} columns={columns} getRowId={r=>String(r.id)} searchPlaceholder="Search event or venue..."/> : <Empty text="No upcoming assigned events."/>}
+          </TabsContent>
+          <TabsContent value="past" className="mt-4">
+            {past.length ? <DataTable data={past} columns={columns} getRowId={r=>String(r.id)} searchPlaceholder="Search event or venue..."/> : <Empty text="No past assigned events."/>}
+          </TabsContent>
+        </Tabs>
       ) : <Empty/>}
     </div>
   );
@@ -49,4 +64,4 @@ export function StaffEventsPage(){
 
 function Loading(){return <div className="rounded-xl bg-surface p-10 text-center text-sm text-text-secondary ring-1 ring-foreground/10">Loading assigned events...</div>}
 function ErrorState({message}:{message:string}){return <div className="rounded-xl bg-surface p-10 text-center text-sm text-danger ring-1 ring-foreground/10">{message}</div>}
-function Empty(){return <div className="rounded-xl bg-surface p-10 text-center text-sm text-text-secondary ring-1 ring-foreground/10">You have not been assigned to any events yet.</div>}
+function Empty({text}:{text?:string}={}){return <div className="rounded-xl bg-surface p-10 text-center text-sm text-text-secondary ring-1 ring-foreground/10">{text??"You have not been assigned to any events yet."}</div>}

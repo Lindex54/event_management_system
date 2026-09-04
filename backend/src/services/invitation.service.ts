@@ -4,14 +4,15 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { pool } from "../config/database";
 import { sendEmail } from "./mail.service";
 
-const setupTokenValidHours = 48;
+const setupTokenValidHours = 24;
+const passwordResetValidHours = 24;
 const frontendUrl = (process.env.FRONTEND_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
 function tokenHash(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export async function createSetupToken(userId: number, createdByUserId: number): Promise<string> {
+export async function createSetupToken(userId: number, createdByUserId: number | null): Promise<string> {
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + setupTokenValidHours * 60 * 60 * 1000);
   await pool.execute<ResultSetHeader>(
@@ -48,6 +49,59 @@ export async function consumeSetupToken(tokenId: number): Promise<void> {
   await pool.execute("UPDATE account_setup_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = ?", [tokenId]);
 }
 
+export async function createPasswordResetToken(userId: number): Promise<string> {
+  const token = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + passwordResetValidHours * 60 * 60 * 1000);
+  await pool.execute<ResultSetHeader>(
+    "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
+    [userId, tokenHash(token), expiresAt],
+  );
+  return token;
+}
+
+interface PasswordResetTokenRow extends RowDataPacket {
+  tokenId: number;
+  userId: number;
+  firstName: string;
+  lastName: string | null;
+  email: string;
+}
+
+export async function validatePasswordResetToken(token: string): Promise<{ tokenId: number; userId: number; name: string; email: string } | null> {
+  const [rows] = await pool.query<PasswordResetTokenRow[]>(
+    `SELECT t.id AS tokenId, t.user_id AS userId, p.first_name AS firstName, p.last_name AS lastName, p.email
+       FROM password_reset_tokens t
+       JOIN users u ON u.id = t.user_id
+       JOIN people p ON p.id = u.person_id
+      WHERE t.token_hash = ? AND t.used_at IS NULL AND t.expires_at > CURRENT_TIMESTAMP AND u.status = 'Active' AND u.deleted_at IS NULL
+      LIMIT 1`,
+    [tokenHash(token)],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return { tokenId: row.tokenId, userId: row.userId, name: [row.firstName, row.lastName].filter(Boolean).join(" "), email: row.email };
+}
+
+export async function consumePasswordResetToken(tokenId: number): Promise<void> {
+  await pool.execute("UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = ?", [tokenId]);
+}
+
+export async function sendPasswordResetEmail(opts: { to: string; name: string; token: string }): Promise<void> {
+  const link = `${frontendUrl}/reset-password?token=${opts.token}`;
+  await sendEmail({
+    to: opts.to,
+    subject: "Reset your Evently password",
+    text: `Hi ${opts.name}, we received a request to reset your Evently password. Reset it here: ${link} (this link expires in ${passwordResetValidHours} hours and can only be used once). If you didn't request this, you can ignore this email.`,
+    html: emailShell("Reset your password", `
+      <p>Hi ${opts.name},</p>
+      <p>We received a request to reset your Evently password. Click below to choose a new one.</p>
+      <p style="margin:24px 0"><a href="${link}" style="background:#2563eb;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block">Reset Password</a></p>
+      <p style="font-size:13px;color:#6b7280">This link expires in ${passwordResetValidHours} hours and can only be used once. If the button doesn't work, copy this link into your browser:<br>${link}</p>
+      <p style="font-size:13px;color:#6b7280">If you didn't request this, you can safely ignore this email — your password will not be changed.</p>
+    `),
+  });
+}
+
 export async function organizerApprovalStatus(userId: number): Promise<string | null> {
   const [rows] = await pool.query<RowDataPacket[]>("SELECT status FROM organizers WHERE user_id=? LIMIT 1", [userId]);
   return rows[0]?.status ?? null;
@@ -71,10 +125,10 @@ export async function sendInvitationEmail(opts: { to: string; name: string; role
   await sendEmail({
     to: opts.to,
     subject: "You've been added to Evently — set up your account",
-    text: `Hi ${opts.name}, an administrator has created a ${opts.roleName} account for you on Evently. Set your password here: ${link} (this link expires in ${setupTokenValidHours} hours).`,
+    text: `Hi ${opts.name}, a ${opts.roleName} account has been created for you on Evently. Set your password here: ${link} (this link expires in ${setupTokenValidHours} hours).`,
     html: emailShell("You've been invited to Evently", `
       <p>Hi ${opts.name},</p>
-      <p>An administrator has created a <strong>${opts.roleName}</strong> account for you on Evently. Click below to set your password and activate your account.</p>
+      <p>A <strong>${opts.roleName}</strong> account has been created for you on Evently. Click below to set your password and activate your account.</p>
       <p style="margin:24px 0"><a href="${link}" style="background:#2563eb;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block">Set Your Password</a></p>
       <p style="font-size:13px;color:#6b7280">This link expires in ${setupTokenValidHours} hours and can only be used once. If the button doesn't work, copy this link into your browser:<br>${link}</p>
     `),

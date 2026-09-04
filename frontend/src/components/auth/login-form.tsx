@@ -22,6 +22,7 @@ export function LoginForm() {
   const [remember, setRemember] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [errors, setErrors] = React.useState<{ email?: string; password?: string }>({});
+  const [locked, setLocked] = React.useState(false);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -32,13 +33,14 @@ export function LoginForm() {
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
 
-    setLoading(true);
+    setLoading(true); setLocked(false);
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email.trim(), password }) });
       const result = await response.json();
       if (!response.ok || !result.success) {
         const message = result.message ?? "Unable to sign in.";
         if (result.pending) { toast.warning(message, { duration: 8000 }); setErrors({}); return; }
+        if (result.locked) { setLocked(true); setErrors({}); return; }
         setErrors({ password: message });
         return;
       }
@@ -99,10 +101,17 @@ export function LoginForm() {
             <Checkbox checked={remember} onCheckedChange={(checked) => setRemember(checked === true)} aria-label="Remember me" />
             Remember me
           </label>
-          <button type="button" onClick={() => toast.info("Password recovery will be connected to the backend.")} className="text-sm font-semibold text-primary hover:underline">
+          <Link href="/forgot-password" className="text-sm font-semibold text-primary hover:underline">
             Forgot password?
-          </button>
+          </Link>
         </div>
+
+        {locked && (
+          <div className="rounded-lg bg-danger/10 p-3 text-sm text-danger" role="alert">
+            Too many failed attempts. Your account is locked.{" "}
+            <Link href="/forgot-password" className="font-semibold underline">Reset your password</Link> to sign in again.
+          </div>
+        )}
 
         <Button type="submit" disabled={loading} className="h-11 w-full bg-primary font-semibold hover:bg-primary-dark">
           {loading ? "Signing in..." : "Sign In"}

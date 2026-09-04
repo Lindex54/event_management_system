@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import type { PublicEvent } from "@/lib/api/public-events";
 
-export function PublicEventCard({ event }: { event: PublicEvent }) {
+export function PublicEventCard({ event, featured = false, showOrganizer = false }: { event: PublicEvent; featured?: boolean; showOrganizer?: boolean }) {
   const full = event.registrations >= event.capacity;
   return (
     <Link href={`/events/${event.slug}`} className="group block h-full">
@@ -23,7 +23,8 @@ export function PublicEventCard({ event }: { event: PublicEvent }) {
           ) : (
             <div className="flex h-full w-full items-center justify-center text-text-secondary/40"><ImageOff className="size-8" /></div>
           )}
-          {full && <Badge variant="outline" className="absolute top-3 right-3 border-danger/20 bg-danger/10 text-danger backdrop-blur-sm">Sold Out</Badge>}
+          {featured && <Badge className="absolute top-3 left-3 bg-accent text-navy hover:bg-accent">Featured</Badge>}
+          <Badge variant="outline" className={`absolute top-3 right-3 backdrop-blur-sm ${full ? "border-danger/20 bg-danger/10 text-danger" : "border-success/20 bg-success/10 text-success"}`}>{full ? "Sold Out" : "Registration Open"}</Badge>
         </div>
         <CardContent className="flex flex-1 flex-col p-5">
           <h3 className="line-clamp-2 text-lg leading-6 font-semibold text-text-primary">{event.name}</h3>
@@ -33,8 +34,9 @@ export function PublicEventCard({ event }: { event: PublicEvent }) {
             {event.venue && <p className="flex items-center gap-2"><MapPin className="size-4 shrink-0 text-primary" aria-hidden="true" /><span className="truncate">{event.venue}</span></p>}
           </div>
           {event.description && <p className="mt-4 line-clamp-2 border-t border-border pt-4 text-xs text-text-secondary">{event.description}</p>}
+          {showOrganizer && <p className="mt-3 text-xs text-text-secondary">Organized by <span className="font-semibold text-text-primary">{event.organizer}</span></p>}
           <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-primary transition-colors group-hover:text-primary-dark">
-            View Event
+            {full ? "View Event" : "Register for Event"}
             <ArrowRight className="size-4" aria-hidden="true" />
           </span>
         </CardContent>

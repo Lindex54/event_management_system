@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 "use client";
-import * as React from "react";import { useSearchParams } from "next/navigation";import { Mic2,MoreHorizontal,Pencil,Plus,Trash2,UserPlus2 } from "lucide-react";import { toast } from "sonner";import { ConfirmDialog } from "@/components/admin/shared/confirm-dialog";import { PageHeader } from "@/components/admin/shared/page-header";import { StatusBadge } from "@/components/admin/shared/status-badge";import { Avatar,AvatarFallback,AvatarImage } from "@/components/ui/avatar";import { Badge } from "@/components/ui/badge";import { Button } from "@/components/ui/button";import { Card,CardContent } from "@/components/ui/card";import { Dialog,DialogContent,DialogDescription,DialogFooter,DialogHeader,DialogTitle } from "@/components/ui/dialog";import { DropdownMenu,DropdownMenuContent,DropdownMenuItem,DropdownMenuTrigger } from "@/components/ui/dropdown-menu";import { Input } from "@/components/ui/input";import { Label } from "@/components/ui/label";import { Select,SelectContent,SelectItem,SelectTrigger,SelectValue } from "@/components/ui/select";import { Textarea } from "@/components/ui/textarea";import { organizerApi } from "@/lib/api/organizer";
+import * as React from "react";import { useSearchParams } from "next/navigation";import { ImagePlus,Mic2,MoreHorizontal,Pencil,Plus,Trash2,UserPlus2,X } from "lucide-react";import { toast } from "sonner";import { ConfirmDialog } from "@/components/admin/shared/confirm-dialog";import { PageHeader } from "@/components/admin/shared/page-header";import { StatusBadge } from "@/components/admin/shared/status-badge";import { Avatar,AvatarFallback,AvatarImage } from "@/components/ui/avatar";import { Badge } from "@/components/ui/badge";import { Button } from "@/components/ui/button";import { Card,CardContent } from "@/components/ui/card";import { Dialog,DialogContent,DialogDescription,DialogFooter,DialogHeader,DialogTitle } from "@/components/ui/dialog";import { DropdownMenu,DropdownMenuContent,DropdownMenuItem,DropdownMenuTrigger } from "@/components/ui/dropdown-menu";import { Input } from "@/components/ui/input";import { Label } from "@/components/ui/label";import { Select,SelectContent,SelectItem,SelectTrigger,SelectValue } from "@/components/ui/select";import { Textarea } from "@/components/ui/textarea";import { organizerApi } from "@/lib/api/organizer";
 
 interface EventOption{id:number;name:string;}
 interface Speaker{id:number;eventId:number;event:string;name:string;firstName:string;lastName:string|null;email:string;telephone:string|null;title:string;organization:string|null;bio:string|null;photoUrl:string|null;type:"Speaker"|"Guest";status:"Pending"|"Confirmed";}
@@ -18,6 +18,9 @@ export function OrganizerSpeakersPage(){
   const[form,setForm]=React.useState(emptyForm);
   const[saving,setSaving]=React.useState(false);
   const[removing,setRemoving]=React.useState<Speaker>();
+  const[photoFile,setPhotoFile]=React.useState<File>();
+  const[photoPreview,setPhotoPreview]=React.useState("");
+  const[photoError,setPhotoError]=React.useState("");
 
   React.useEffect(()=>{ void organizerApi<EventOption[]>("/events").then(setEvents).catch(()=>undefined); },[]);
 
@@ -29,15 +32,32 @@ export function OrganizerSpeakersPage(){
   },[eventFilter]);
   React.useEffect(()=>{ void load(); },[load]);
 
-  function openCreate(){ setForm({...emptyForm,eventId:eventFilter!=="all"?eventFilter:(events[0]?String(events[0].id):"")}); setDialogOpen(true); }
-  function openEdit(speaker:Speaker){ setForm({id:speaker.id,eventId:String(speaker.eventId),firstName:speaker.firstName,lastName:speaker.lastName??"",email:speaker.email,telephone:speaker.telephone??"",title:speaker.title,organization:speaker.organization??"",bio:speaker.bio??"",photoUrl:speaker.photoUrl??"",type:speaker.type,status:speaker.status}); setDialogOpen(true); }
+  function resetPhoto(){ setPhotoFile(undefined); setPhotoPreview(""); setPhotoError(""); }
+  function openCreate(){ setForm({...emptyForm,eventId:eventFilter!=="all"?eventFilter:(events[0]?String(events[0].id):"")}); resetPhoto(); setDialogOpen(true); }
+  function openEdit(speaker:Speaker){ setForm({id:speaker.id,eventId:String(speaker.eventId),firstName:speaker.firstName,lastName:speaker.lastName??"",email:speaker.email,telephone:speaker.telephone??"",title:speaker.title,organization:speaker.organization??"",bio:speaker.bio??"",photoUrl:speaker.photoUrl??"",type:speaker.type,status:speaker.status}); resetPhoto(); setDialogOpen(true); }
+
+  async function selectPhoto(inputEvent:React.ChangeEvent<HTMLInputElement>){
+    const file=inputEvent.target.files?.[0];
+    if(!file) return;
+    const allowed=["image/jpeg","image/png","image/webp","image/gif"];
+    if(!allowed.includes(file.type)){ setPhotoError("Choose a JPG, PNG, WebP, or GIF image"); inputEvent.target.value=""; return; }
+    if(file.size>5*1024*1024){ setPhotoError("The photo must be smaller than 5 MB"); inputEvent.target.value=""; return; }
+    setPhotoError("");
+    setPhotoFile(file);
+    setPhotoPreview(await new Promise<string>((resolve,reject)=>{ const reader=new FileReader(); reader.onload=()=>resolve(String(reader.result)); reader.onerror=()=>reject(new Error("Unable to read the selected image")); reader.readAsDataURL(file); }));
+  }
 
   async function submit(e:React.FormEvent){
     e.preventDefault();
     if(!form.eventId||!form.firstName.trim()||!form.email.trim()||!form.title.trim()){ toast.error("Event, first name, email and title are required"); return; }
     setSaving(true);
     try{
-      const body=JSON.stringify({eventId:Number(form.eventId),firstName:form.firstName.trim(),lastName:form.lastName.trim()||null,email:form.email.trim(),telephone:form.telephone.trim()||null,title:form.title.trim(),organization:form.organization.trim()||null,bio:form.bio.trim()||null,photoUrl:form.photoUrl.trim()||null,type:form.type,status:form.status});
+      let photoUrl=form.photoUrl.trim();
+      if(photoFile){
+        const upload=await organizerApi<{imageUrl:string}>("/uploads/event-image",{method:"POST",body:JSON.stringify({dataUrl:photoPreview,originalName:photoFile.name})});
+        photoUrl=upload.imageUrl??"";
+      }
+      const body=JSON.stringify({eventId:Number(form.eventId),firstName:form.firstName.trim(),lastName:form.lastName.trim()||null,email:form.email.trim(),telephone:form.telephone.trim()||null,title:form.title.trim(),organization:form.organization.trim()||null,bio:form.bio.trim()||null,photoUrl:photoUrl||null,type:form.type,status:form.status});
       await organizerApi(form.id?`/speakers/${form.id}`:"/speakers",{method:form.id?"PUT":"POST",body});
       toast.success(form.id?`${form.type} updated`:`${form.type} added`);
       setDialogOpen(false); await load();
@@ -108,7 +128,24 @@ export function OrganizerSpeakersPage(){
               <div className="space-y-2"><Label>Type *</Label><Select value={form.type} onValueChange={v=>setForm(f=>({...f,type:v}))}><SelectTrigger className="h-10 w-full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="Speaker">Speaker</SelectItem><SelectItem value="Guest">Guest</SelectItem></SelectContent></Select></div>
               <div className="space-y-2"><Label>Status *</Label><Select value={form.status} onValueChange={v=>setForm(f=>({...f,status:v}))}><SelectTrigger className="h-10 w-full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="Pending">Pending</SelectItem><SelectItem value="Confirmed">Confirmed</SelectItem></SelectContent></Select></div>
             </div>
-            <div className="space-y-2"><Label htmlFor="sp-photo">Photo URL</Label><Input id="sp-photo" type="url" value={form.photoUrl} onChange={e=>setForm(f=>({...f,photoUrl:e.target.value}))} placeholder="https://example.com/photo.jpg"/></div>
+            <div className="space-y-2">
+              <Label htmlFor="sp-photo-file">Photo (Optional)</Label>
+              <input id="sp-photo-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" onChange={e=>void selectPhoto(e)}/>
+              <label htmlFor="sp-photo-file" className="flex min-h-16 cursor-pointer items-center justify-center gap-3 rounded-xl border border-dashed border-input bg-background px-4 text-sm text-text-secondary transition-colors hover:border-primary hover:text-primary">
+                <ImagePlus className="size-5"/><span>{photoFile?photoFile.name:"Choose a photo from your device (JPG, PNG, WebP or GIF; maximum 5 MB)"}</span>
+              </label>
+              {photoError && <p className="text-xs text-danger">{photoError}</p>}
+              {(photoPreview||form.photoUrl) && (
+                <div className="relative flex items-center gap-3 rounded-lg border border-border p-2">
+                  <Avatar className="size-12"><AvatarImage src={photoPreview||form.photoUrl} alt="Preview"/><AvatarFallback>?</AvatarFallback></Avatar>
+                  <span className="flex-1 truncate text-xs text-text-secondary">{photoFile?"New photo selected":"Current photo"}</span>
+                  {photoFile && <Button type="button" variant="secondary" size="icon-sm" onClick={resetPhoto} aria-label="Remove selected photo"><X/></Button>}
+                </div>
+              )}
+              <Label htmlFor="sp-photo-url" className="text-xs font-normal text-text-secondary">Or paste a photo URL instead</Label>
+              <Input id="sp-photo-url" type="url" value={form.photoUrl} onChange={e=>setForm(f=>({...f,photoUrl:e.target.value}))} placeholder="https://example.com/photo.jpg" disabled={Boolean(photoFile)}/>
+              <p className="text-xs text-text-secondary">A device photo takes priority over the URL above.</p>
+            </div>
             <div className="space-y-2"><Label htmlFor="sp-bio">Bio</Label><Textarea id="sp-bio" value={form.bio} onChange={e=>setForm(f=>({...f,bio:e.target.value}))}/></div>
             <DialogFooter><Button type="button" variant="outline" onClick={()=>setDialogOpen(false)} disabled={saving}>Cancel</Button><Button type="submit" disabled={saving}>{saving?"Saving...":form.id?"Save Changes":"Add"}</Button></DialogFooter>
           </form>

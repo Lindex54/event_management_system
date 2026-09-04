@@ -5,15 +5,20 @@ import { pool } from "../config/database";
 import { verifyPassword } from "../utils/password";
 
 const sessionHours = 8;
+const maxFailedLoginAttempts = 5;
 
 interface AdminAccountRow extends RowDataPacket {
   id: number;
   username: string;
   passwordHash: string;
+  failedLoginAttempts: number;
+  lockedAt: Date | null;
   firstName: string;
   lastName: string | null;
   email: string;
 }
+
+export type AdminAuthOutcome = { result: "OK"; admin: AdminIdentity } | { result: "LOCKED" } | { result: "INVALID" };
 
 interface AdminSessionRow extends RowDataPacket {
   userId: number;
@@ -43,9 +48,9 @@ function identity(row: AdminAccountRow | AdminSessionRow): AdminIdentity {
   };
 }
 
-export async function authenticateAdministrator(username: string, password: string): Promise<AdminIdentity | null> {
+export async function authenticateAdministrator(username: string, password: string): Promise<AdminAuthOutcome> {
   const [rows] = await pool.query<AdminAccountRow[]>(
-    `SELECT u.id, u.username, u.password_hash AS passwordHash,
+    `SELECT u.id, u.username, u.password_hash AS passwordHash, u.failed_login_attempts AS failedLoginAttempts, u.locked_at AS lockedAt,
             p.first_name AS firstName, p.last_name AS lastName, p.email AS email
        FROM users AS u
        JOIN people AS p ON p.id = u.person_id
@@ -59,8 +64,19 @@ export async function authenticateAdministrator(username: string, password: stri
     [username],
   );
   const account = rows[0];
-  if (!account || !(await verifyPassword(password, account.passwordHash))) return null;
-  return identity(account);
+  if (!account) return { result: "INVALID" };
+  if (account.lockedAt) return { result: "LOCKED" };
+  if (!(await verifyPassword(password, account.passwordHash))) {
+    const attempts = account.failedLoginAttempts + 1;
+    if (attempts >= maxFailedLoginAttempts) {
+      await pool.execute("UPDATE users SET failed_login_attempts=?,locked_at=CURRENT_TIMESTAMP WHERE id=?", [attempts, account.id]);
+      return { result: "LOCKED" };
+    }
+    await pool.execute("UPDATE users SET failed_login_attempts=? WHERE id=?", [attempts, account.id]);
+    return { result: "INVALID" };
+  }
+  if (account.failedLoginAttempts > 0) await pool.execute("UPDATE users SET failed_login_attempts=0 WHERE id=?", [account.id]);
+  return { result: "OK", admin: identity(account) };
 }
 
 export async function createAdminSession(userId: number, ipAddress?: string, userAgent?: string): Promise<string> {

@@ -2,16 +2,22 @@
 
 import * as React from "react";
 import { format } from "date-fns";
-import { FileText, ImagePlus, X } from "lucide-react";
+import { FileText, ImagePlus, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { CalendarWithTime } from "@/components/admin/shared/calendar-with-time";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { organizerApi } from "@/lib/api/organizer";
+
+type StaffOption = { id: number; name: string; email: string };
+type EventApi = <T>(path: string, init?: RequestInit) => Promise<T>;
 
 export type OrganizerEventRecord = {
   id: number; name: string; venueId: number; theme?: string | null; description?: string | null;
@@ -21,13 +27,19 @@ export type OrganizerEventRecord = {
 };
 type SelectOption = { id: number; name: string };
 
-export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpenChange, onSaved }: {
+export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpenChange, onSaved, api = organizerApi, showCoOrganizers = true }: {
   trigger?: React.ReactNode; event?: OrganizerEventRecord; open?: boolean; onOpenChange?: (open: boolean) => void; onSaved?: () => void | Promise<void>;
+  api?: EventApi; showCoOrganizers?: boolean;
 }) {
   const [internalOpen, setInternalOpen] = React.useState(false);
   const open = controlledOpen ?? internalOpen;
   const changeOpen = (next: boolean) => { setInternalOpen(next); onOpenChange?.(next); };
   const [venues, setVenues] = React.useState<SelectOption[]>([]);
+  const [staffOptions, setStaffOptions] = React.useState<StaffOption[]>([]);
+  const [coOrganizerIds, setCoOrganizerIds] = React.useState<number[]>([]);
+  const [inviteOpen, setInviteOpen] = React.useState(false);
+  const [inviteFirstName, setInviteFirstName] = React.useState(""); const [inviteLastName, setInviteLastName] = React.useState(""); const [inviteEmail, setInviteEmail] = React.useState("");
+  const [inviting, setInviting] = React.useState(false);
   const [name, setName] = React.useState(event?.name ?? ""); const [venueId, setVenueId] = React.useState(event ? String(event.venueId) : "");
   const [theme, setTheme] = React.useState(event?.theme ?? ""); const [description, setDescription] = React.useState(event?.description ?? ""); const [capacity, setCapacity] = React.useState(event ? String(event.capacity) : "");
   const [date, setDate] = React.useState<Date | undefined>(event?.date ? new Date(`${event.date.slice(0, 10)}T00:00:00`) : undefined); const [startTime, setStartTime] = React.useState(event?.time ?? ""); const [endTime, setEndTime] = React.useState(event?.endTime ?? "");
@@ -40,8 +52,34 @@ export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpen
 
   React.useEffect(() => {
     if (!open) return;
-    void organizerApi<SelectOption[]>("/venues").then(setVenues).catch((reason) => setError(reason instanceof Error ? reason.message : "Unable to load venues"));
-  }, [open]);
+    void api<SelectOption[]>("/venues").then(setVenues).catch((reason) => setError(reason instanceof Error ? reason.message : "Unable to load venues"));
+  }, [open, api]);
+
+  React.useEffect(() => {
+    if (!open || !showCoOrganizers) return;
+    void Promise.all([
+      api<StaffOption[]>("/staff-options"),
+      event ? api<{ userId: number }[]>(`/events/${event.id}/co-organizers`) : Promise.resolve([]),
+    ]).then(([options, assigned]) => { setStaffOptions(options); setCoOrganizerIds(assigned.map((a) => a.userId)); })
+      .catch((reason) => setError(reason instanceof Error ? reason.message : "Unable to load co-organizers"));
+  }, [open, showCoOrganizers, event, api]);
+
+  function toggleCoOrganizer(userId: number) {
+    setCoOrganizerIds((current) => current.includes(userId) ? current.filter((id) => id !== userId) : [...current, userId]);
+  }
+
+  async function inviteStaffMember() {
+    if (!inviteFirstName.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail.trim())) { toast.error("A first name and valid email are required."); return; }
+    setInviting(true);
+    try {
+      const created = await api<StaffOption>("/staff-options", { method: "POST", body: JSON.stringify({ firstName: inviteFirstName.trim(), lastName: inviteLastName.trim() || undefined, email: inviteEmail.trim() }) });
+      toast.success(`Invitation sent to ${created.email}`);
+      setStaffOptions((current) => [...current, created]);
+      setCoOrganizerIds((current) => [...current, created.id]);
+      setInviteFirstName(""); setInviteLastName(""); setInviteEmail(""); setInviteOpen(false);
+    } catch (reason) { toast.error(reason instanceof Error ? reason.message : "Unable to invite staff member"); }
+    finally { setInviting(false); }
+  }
 
   async function selectImage(inputEvent: React.ChangeEvent<HTMLInputElement>) {
     const file = inputEvent.target.files?.[0];
@@ -75,7 +113,7 @@ export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpen
     try {
       let savedImageUrl = imageUrl.trim();
       if (imageFile) {
-        const upload = await organizerApi<{ imageUrl: string }>("/uploads/event-image", {
+        const upload = await api<{ imageUrl: string }>("/uploads/event-image", {
           method: "POST",
           body: JSON.stringify({ dataUrl: await readAsDataUrl(imageFile), originalName: imageFile.name }),
         });
@@ -88,7 +126,7 @@ export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpen
         agendaPayload = { agendaType: "Url", agendaUrl: agendaUrl.trim(), agendaFileName: null, agendaFileType: null };
       } else if (agendaType === "File") {
         if (agendaFile) {
-          const upload = await organizerApi<{ agendaUrl: string; agendaFileType: string; agendaFileName: string }>("/uploads/event-agenda", {
+          const upload = await api<{ agendaUrl: string; agendaFileType: string; agendaFileName: string }>("/uploads/event-agenda", {
             method: "POST",
             body: JSON.stringify({ dataUrl: await readAsDataUrl(agendaFile), originalName: agendaFile.name }),
           });
@@ -98,11 +136,15 @@ export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpen
         }
       }
 
-      await organizerApi(`/events${event ? `/${event.id}` : ""}`, { method: event ? "PUT" : "POST", body: JSON.stringify({
+      const saved = await api<{ id?: number }>(`/events${event ? `/${event.id}` : ""}`, { method: event ? "PUT" : "POST", body: JSON.stringify({
         name: name.trim(), venueId: Number(venueId), theme, description,
         date: format(date, "yyyy-MM-dd"), startTime: startTime || null, endTime: endTime || null, timezone,
         capacity: Number(capacity), status, imageUrl: savedImageUrl, imageAlt, ...agendaPayload,
       }) });
+      const eventId = event?.id ?? saved?.id;
+      if (showCoOrganizers && eventId) {
+        await api(`/events/${eventId}/co-organizers`, { method: "PUT", body: JSON.stringify({ userIds: coOrganizerIds }) });
+      }
       toast.success(event ? "Event updated" : "Event created"); await onSaved?.(); changeOpen(false);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to save event"); }
     finally { setSaving(false); }
@@ -136,6 +178,42 @@ export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpen
     )}
     {agendaType === "Url" && <Input type="url" value={agendaUrl} onChange={(e) => setAgendaUrl(e.target.value)} placeholder="https://example.com/agenda.pdf" className="h-10" />}
   </div>
+
+  {showCoOrganizers && (
+    <div className="space-y-3 rounded-xl border border-border p-4">
+      <Label className="flex items-center gap-2"><Users className="size-4 text-primary" />Co-organizers{coOrganizerIds.length > 0 && <Badge variant="secondary">{coOrganizerIds.length} selected</Badge>}</Label>
+      {staffOptions.length ? (
+        <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+          {staffOptions.map((staff) => (
+            <label key={staff.id} htmlFor={`co-organizer-${staff.id}`} className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted">
+              <Checkbox id={`co-organizer-${staff.id}`} checked={coOrganizerIds.includes(staff.id)} onCheckedChange={() => toggleCoOrganizer(staff.id)} />
+              <Avatar className="size-6"><AvatarFallback className="text-[10px]">{staff.name.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
+              <span className="flex-1 truncate text-sm text-text-primary">{staff.name}</span>
+              <span className="truncate text-xs text-text-secondary">{staff.email}</span>
+            </label>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-text-secondary">No active Event Staff accounts are available to assign yet.</p>
+      )}
+      <p className="text-xs text-text-secondary">Co-organizers can manage this event&apos;s details, registrations, and schedule — they only gain access to events they&apos;re assigned to.</p>
+      {(inviteOpen ? (
+        <div className="space-y-2.5 rounded-lg border border-dashed border-input p-3">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Input value={inviteFirstName} onChange={(e) => setInviteFirstName(e.target.value)} placeholder="First name" className="h-9" />
+            <Input value={inviteLastName} onChange={(e) => setInviteLastName(e.target.value)} placeholder="Last name (optional)" className="h-9" />
+          </div>
+          <Input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="staff@example.com" className="h-9" />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setInviteOpen(false)} disabled={inviting}>Cancel</Button>
+            <Button type="button" size="sm" disabled={inviting} onClick={() => void inviteStaffMember()}>{inviting ? "Sending…" : "Send Invite"}</Button>
+          </div>
+        </div>
+      ) : (
+        <Button type="button" variant="ghost" size="sm" className="text-primary" onClick={() => setInviteOpen(true)}>+ Invite a new staff member</Button>
+      ))}
+    </div>
+  )}
 
   <div><Label className="mb-2 block">Event Date *</Label><CalendarWithTime date={date} onDateChange={setDate} startTime={startTime} onStartTimeChange={setStartTime} endTime={endTime} onEndTimeChange={setEndTime} timezone={timezone} onTimezoneChange={setTimezone} /></div>{error && <p className="text-sm text-danger" role="alert">{error}</p>}<DialogFooter><Button type="button" variant="outline" onClick={() => changeOpen(false)} disabled={saving}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving…" : event ? "Save Changes" : "Create Event"}</Button></DialogFooter></form></DialogContent></Dialog>;
 }

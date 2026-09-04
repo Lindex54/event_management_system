@@ -27,11 +27,16 @@ router.post("/login", async (request, response) => {
   }
 
   try {
-    const administrator = await authenticateAdministrator(username, password);
-    if (!administrator) {
+    const outcome = await authenticateAdministrator(username, password);
+    if (outcome.result === "LOCKED") {
+      response.status(423).json({ success: false, locked: true, message: "Too many failed attempts. Reset your password to sign in again." });
+      return;
+    }
+    if (outcome.result === "INVALID") {
       response.status(401).json({ success: false, message: "Invalid administrator credentials" });
       return;
     }
+    const administrator = outcome.admin;
     const token = await createAdminSession(administrator.id, request.ip, request.get("user-agent"));
     response.cookie(adminSessionCookieName, token, sessionCookieOptions(adminSessionMaxAgeMs));
     response.json({ success: true, message: "Administrator signed in", user: administrator });

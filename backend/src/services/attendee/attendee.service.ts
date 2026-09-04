@@ -1,11 +1,13 @@
 import { randomBytes } from "node:crypto";
+import QRCode from "qrcode";
 import { pool } from "../../config/database";
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
 const registeredEventSelect = `SELECT e.id eventId,e.name,e.slug,DATE_FORMAT(e.event_date,'%Y-%m-%d') date,DATE_FORMAT(e.event_date,'%b %e, %Y') dateLabel,
   TIME_FORMAT(e.start_time,'%H:%i') time,e.image_url imageUrl,e.image_alt imageAlt,v.name venue,e.status eventStatus,
-  r.id registrationId,r.reference_code referenceCode,r.status registrationStatus,
-  CASE WHEN ac.id IS NULL THEN 'Not Checked In' ELSE 'Checked In' END checkInStatus
+  r.id registrationId,r.reference_code referenceCode,r.ticket_token ticketToken,r.status registrationStatus,
+  CASE WHEN ac.id IS NULL THEN 'Not Checked In' ELSE 'Checked In' END checkInStatus,ac.checked_in_at checkedInAt,
+  CASE WHEN ac.id IS NOT NULL AND r.status='Confirmed' AND e.status IN ('Upcoming','Active') THEN TRUE ELSE FALSE END canEnterEvent
   FROM registrations r JOIN events e ON e.id=r.event_id AND e.deleted_at IS NULL
   LEFT JOIN venues v ON v.id=e.venue_id
   LEFT JOIN attendance_check_ins ac ON ac.registration_id=r.id
@@ -109,15 +111,16 @@ export async function registerForEvent(attendeeId: number, eventId: number): Pro
     if (Number(capacityRow?.count ?? 0) >= Number(event.capacity)) { await connection.rollback(); return "EVENT_FULL"; }
 
     const referenceCode = `REG-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString("hex").toUpperCase()}`;
+    const ticketToken = randomBytes(32).toString("hex");
     if (existing) {
       await connection.execute(
-        "UPDATE registrations SET status='Confirmed',reference_code=?,registered_at=CURRENT_TIMESTAMP,cancelled_at=NULL WHERE id=?",
-        [referenceCode, existing.id],
+        "UPDATE registrations SET status='Confirmed',reference_code=?,ticket_token=?,registered_at=CURRENT_TIMESTAMP,cancelled_at=NULL WHERE id=?",
+        [referenceCode, ticketToken, existing.id],
       );
     } else {
       await connection.execute(
-        "INSERT INTO registrations(reference_code,event_id,attendee_id,status)VALUES(?,?,?,'Confirmed')",
-        [referenceCode, eventId, attendeeId],
+        "INSERT INTO registrations(reference_code,ticket_token,event_id,attendee_id,status)VALUES(?,?,?,?, 'Confirmed')",
+        [referenceCode, ticketToken, eventId, attendeeId],
       );
     }
     await connection.commit();
@@ -132,14 +135,21 @@ export async function registerForEvent(attendeeId: number, eventId: number): Pro
 
 export async function tickets(attendeeId: number) {
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT r.id registrationId,r.reference_code referenceCode,e.name event,DATE_FORMAT(e.event_date,'%b %e, %Y') date,
-      TIME_FORMAT(e.start_time,'%H:%i') time,v.name venue,r.status,CONCAT_WS(' ',p.first_name,p.last_name) attendeeName
+    `SELECT r.id registrationId,r.reference_code referenceCode,r.ticket_token ticketToken,e.name event,e.slug,DATE_FORMAT(e.event_date,'%b %e, %Y') date,
+      TIME_FORMAT(e.start_time,'%H:%i') time,TIME_FORMAT(e.end_time,'%H:%i') endTime,v.name venue,v.address venueAddress,r.status,
+      CONCAT_WS(' ',p.first_name,p.last_name) attendeeName,ac.checked_in_at checkedInAt,
+      CASE WHEN ac.id IS NOT NULL AND r.status='Confirmed' AND e.status IN ('Upcoming','Active') THEN TRUE ELSE FALSE END canEnterEvent
      FROM registrations r JOIN events e ON e.id=r.event_id LEFT JOIN venues v ON v.id=e.venue_id
      JOIN attendees a ON a.id=r.attendee_id JOIN people p ON p.id=a.person_id
+     LEFT JOIN attendance_check_ins ac ON ac.registration_id=r.id
      WHERE r.attendee_id=? AND r.status<>'Cancelled' AND r.deleted_at IS NULL ORDER BY e.event_date DESC`,
     [attendeeId],
   );
-  return rows;
+  const frontendUrl = (process.env.FRONTEND_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return Promise.all(rows.map(async (row) => {
+    const ticketUrl = `${frontendUrl}/tickets/${row.ticketToken}`;
+    return { ...row, ticketUrl, liveUrl: `${frontendUrl}/events/${row.slug}/live?ticket=${row.ticketToken}`, qrCodeDataUrl: await QRCode.toDataURL(ticketUrl, { width: 320, margin: 2, errorCorrectionLevel: "H" }) };
+  }));
 }
 
 export async function notifications(userId: number) {

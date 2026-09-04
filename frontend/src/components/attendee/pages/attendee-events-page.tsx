@@ -2,7 +2,7 @@
 "use client";
 import * as React from "react";import Link from "next/link";import { CalendarDays,Clock,ImageOff,MapPin,Ticket,UserPlus } from "lucide-react";import { toast } from "sonner";import { PageHeader } from "@/components/admin/shared/page-header";import { StatusBadge } from "@/components/admin/shared/status-badge";import { Button } from "@/components/ui/button";import { Card,CardContent } from "@/components/ui/card";import { Tabs,TabsContent,TabsList,TabsTrigger } from "@/components/ui/tabs";import { attendeeApi } from "@/lib/api/attendee";
 
-interface RegisteredEvent{eventId:number;name:string;slug:string;dateLabel:string;time:string;imageUrl:string|null;imageAlt:string|null;venue:string|null;eventStatus:string;registrationId:number;referenceCode:string;registrationStatus:string;checkInStatus:string;}
+interface RegisteredEvent{eventId:number;name:string;slug:string;dateLabel:string;time:string;imageUrl:string|null;imageAlt:string|null;venue:string|null;eventStatus:string;registrationId:number;referenceCode:string;ticketToken:string;registrationStatus:string;checkInStatus:string;canEnterEvent:boolean|number;}
 interface AvailableEvent{id:number;name:string;slug:string;dateLabel:string;time:string;imageUrl:string|null;imageAlt:string|null;venue:string|null;capacity:number;registeredCount:number;registrationId:number|null;registrationStatus:string|null;}
 
 export function AttendeeEventsPage(){
@@ -59,7 +59,7 @@ export function AttendeeEventsPage(){
                     <div className="flex flex-wrap gap-1.5"><StatusBadge status={event.registrationStatus}/><StatusBadge status={event.eventStatus}/></div>
                     <div className="flex gap-2 pt-1">
                       <Button asChild size="sm" variant="outline" className="flex-1"><Link href="/attendee/registrations">Registration</Link></Button>
-                      <Button asChild size="sm" className="flex-1"><Link href="/attendee/tickets"><Ticket/>Ticket</Link></Button>
+                      {Boolean(event.canEnterEvent) ? <Button asChild size="sm" className="flex-1"><Link href={`/events/${event.slug}/live?ticket=${event.ticketToken}`}>Enter Event</Link></Button> : <Button asChild size="sm" className="flex-1" variant="outline"><Link href="/attendee/tickets"><Ticket/>Ticket</Link></Button>}
                     </div>
                   </CardContent>
                 </Card>

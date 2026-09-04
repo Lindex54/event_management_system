@@ -5,8 +5,10 @@ import { databaseErrorCode, pool } from "./config/database";
 import adminAuthRouter from "./routes/admin-auth.routes";
 import authRouter from "./routes/auth.routes";
 import setupAccountRouter from "./routes/setup-account.routes";
+import passwordResetRouter from "./routes/password-reset.routes";
 import publicEventsRouter from "./routes/public-events.routes";
 import attendeesRouter from "./routes/admin/attendees.routes";
+import dashboardRouter from "./routes/admin/dashboard.routes";
 import eventsRouter from "./routes/admin/events.routes";
 import organizersRouter from "./routes/admin/organizers.routes";
 import registrationsRouter from "./routes/admin/registrations.routes";
@@ -16,6 +18,7 @@ import venuesRouter from "./routes/admin/venues.routes";
 import organizerRouter from "./routes/organizer";
 import staffRouter from "./routes/staff";
 import attendeeRouter from "./routes/attendee";
+import discussionRouter from "./routes/discussion.routes";
 
 const app = express();
 
@@ -41,7 +44,9 @@ app.use("/uploads", express.static("uploads", { fallthrough: false, maxAge: "7d"
 app.use("/api/auth/admin", adminAuthRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/auth", setupAccountRouter);
+app.use("/api/auth", passwordResetRouter);
 app.use("/api/events", publicEventsRouter);
+app.use("/api/admin/dashboard", dashboardRouter);
 app.use("/api/admin/events", eventsRouter);
 app.use("/api/admin/registrations", registrationsRouter);
 app.use("/api/admin/uploads", uploadsRouter);
@@ -52,6 +57,7 @@ app.use("/api/admin/venues", venuesRouter);
 app.use("/api/organizer", organizerRouter);
 app.use("/api/staff", staffRouter);
 app.use("/api/attendee", attendeeRouter);
+app.use("/api/discussions", discussionRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({

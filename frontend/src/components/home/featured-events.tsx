@@ -5,13 +5,13 @@ import { ArrowRight } from "lucide-react";
 import { A11y, Pagination } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/react";
 
-import { EventCard } from "@/components/home/event-card";
-import { featuredEvents } from "@/data/events";
+import { PublicEventCard } from "@/components/events/public-event-card";
+import type { PublicEvent } from "@/lib/api/public-events";
 
 import "swiper/css";
 import "swiper/css/pagination";
 
-export function FeaturedEvents() {
+export function FeaturedEvents({ events }: { events: PublicEvent[] }) {
   return (
     <section id="events" className="py-18 sm:py-22">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -37,9 +37,9 @@ export function FeaturedEvents() {
           }}
           className="featured-events-swiper mt-8 pb-12!"
         >
-          {featuredEvents.map((event) => (
+          {events.map((event) => (
             <SwiperSlide key={event.id} className="h-auto!">
-              <EventCard event={event} showOrganizer />
+              <PublicEventCard event={event} featured showOrganizer />
             </SwiperSlide>
           ))}
         </Swiper>

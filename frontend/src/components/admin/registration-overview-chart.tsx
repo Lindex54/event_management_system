@@ -1,15 +1,12 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import type { ApexOptions } from "apexcharts";
 import { useTheme } from "next-themes";
 
+import { ClientApexChart } from "@/components/charts/client-apex-chart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { registrationTrend } from "@/data/admin-dashboard";
 
-const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
-
-export function RegistrationOverviewChart() {
+export function RegistrationOverviewChart({ trend }: { trend: { categories: string[]; values: number[] } }) {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const options: ApexOptions = {
@@ -23,7 +20,7 @@ export function RegistrationOverviewChart() {
     },
     grid: { borderColor: dark ? "#293548" : "#E2E8F0", strokeDashArray: 4, padding: { left: 8, right: 8 } },
     xaxis: {
-      categories: registrationTrend.categories,
+      categories: trend.categories,
       axisBorder: { show: false },
       axisTicks: { show: false },
       labels: { style: { colors: dark ? "#94A3B8" : "#64748B" } },
@@ -39,7 +36,7 @@ export function RegistrationOverviewChart() {
         <CardDescription>Registrations received over the last 7 days</CardDescription>
       </CardHeader>
       <CardContent className="min-w-0">
-        <Chart options={options} series={[{ name: "Registrations", data: registrationTrend.values }]} type="area" height={290} width="100%" />
+        <ClientApexChart options={options} series={[{ name: "Registrations", data: trend.values }]} type="area" height={290} />
       </CardContent>
     </Card>
   );

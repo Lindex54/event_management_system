@@ -1,12 +1,10 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import type { ApexOptions } from "apexcharts";
 import { useTheme } from "next-themes";
 
+import { ClientApexChart } from "@/components/charts/client-apex-chart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 export function ChartCard({ title, description, type, categories, series, height = 280, horizontal = false }: {
   title: string;
@@ -34,5 +32,5 @@ export function ChartCard({ title, description, type, categories, series, height
     legend: { position: "bottom", labels: { colors: dark ? "#CBD5E1" : "#475569" } },
     tooltip: { theme: dark ? "dark" : "light" },
   };
-  return <Card className="min-w-0 shadow-none"><CardHeader><CardTitle>{title}</CardTitle><CardDescription>{description}</CardDescription></CardHeader><CardContent className="min-w-0"><Chart options={options} series={series} type={type} height={height} width="100%" /></CardContent></Card>;
+  return <Card className="min-w-0 shadow-none"><CardHeader><CardTitle>{title}</CardTitle><CardDescription>{description}</CardDescription></CardHeader><CardContent className="min-w-0"><ClientApexChart options={options} series={series} type={type} height={height} /></CardContent></Card>;
 }

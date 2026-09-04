@@ -93,3 +93,29 @@ export interface ActivityLogRecord {
   id: string; user: string; action: string; module: string; description: string;
   dateTime: string; ipAddress: string; actionType: "Create" | "Update" | "Delete" | "Access";
 }
+
+export interface DashboardStats {
+  totalEvents: number; eventsThisMonth: number; upcomingEvents: number;
+  totalRegistrations: number; registrationsChange: string;
+  totalAttendees: number; attendeesChange: string;
+  totalOrganizers: number; organizersThisMonth: number;
+  eventsToday: number; venuesToday: number;
+}
+export interface DashboardUpcomingEvent {
+  id: number; name: string; slug: string; date: string; dateLabel: string; status: EventStatus;
+  organizer: string; venue: string | null; capacity: number; registrations: number;
+}
+export interface DashboardRegistration {
+  id: number; name: string; email: string; event: string; status: RegistrationStatus; registeredAtLabel: string;
+}
+export interface DashboardActivityItem { id: string; actor: string; description: string; time: string; }
+export interface DashboardAlert { id: string; title: string; detail: string; tone: "info" | "warning" | "danger" | "success"; icon: "bell" | "clock" | "alert"; }
+export interface DashboardData {
+  stats: DashboardStats;
+  registrationTrend: { categories: string[]; values: number[] };
+  eventStatusDistribution: { label: string; value: number }[];
+  upcomingEvents: DashboardUpcomingEvent[];
+  recentRegistrations: DashboardRegistration[];
+  recentActivity: DashboardActivityItem[];
+  systemAlerts: DashboardAlert[];
+}

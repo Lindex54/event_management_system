@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { CheckCircle2, Mail, MoreHorizontal, Plus, Trash2, UserCheck, Users, UserX } from "lucide-react";
+import { CheckCircle2, Lock, LockOpen, Mail, MoreHorizontal, Plus, RefreshCcw, Trash2, UserCheck, Users, UserX } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/admin/shared/confirm-dialog";
@@ -17,7 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { adminApi } from "@/lib/admin-api";
 
-interface PlatformUser { id: number; username: string | null; name: string; email: string; telephone: string | null; role: string; status: "Active" | "Inactive"; joined: string; lastActive: string | null; setupPending: number | boolean; }
+interface PlatformUser { id: number; username: string | null; name: string; email: string; telephone: string | null; role: string; status: "Active" | "Inactive"; joined: string; lastActive: string | null; setupPending: number | boolean; setupCompleted: number | boolean; locked: number | boolean; }
 
 const createFields: FormField[] = [
   { name: "firstName", label: "First Name", required: true },
@@ -33,6 +33,7 @@ export function UsersPage() {
   const [role, setRole] = React.useState("All");
   const [status, setStatus] = React.useState("All");
   const [removeId, setRemoveId] = React.useState<number>();
+  const [resendUser, setResendUser] = React.useState<PlatformUser>();
   const [loading, setLoading] = React.useState(true);
 
   const load = React.useCallback(async () => {
@@ -51,13 +52,26 @@ export function UsersPage() {
     try { await adminApi(`/users/${id}/status`, { method: "PATCH", body: JSON.stringify({ status: nextStatus }) }); toast.success(`User ${nextStatus === "Active" ? "activated" : "deactivated"}`); await load(); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Unable to update user"); }
   }
+  async function resendInvite(id: number) {
+    try { const result = await adminApi<{ message: string }>(`/users/${id}/resend-invite`, { method: "POST" }); toast.success(result.message ?? "Setup link resent"); await load(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Unable to resend the setup link"); }
+  }
+  async function unlockAccount(id: number) {
+    try { await adminApi(`/users/${id}/unlock`, { method: "POST" }); toast.success("Account unlocked"); await load(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Unable to unlock this account"); }
+  }
 
   const columns: ManagementColumn<PlatformUser>[] = [
     { id: "user", label: "User", accessor: (row) => `${row.name} ${row.email}`, cell: (row) => <div><p className="font-semibold text-text-primary">{row.name}</p><p className="text-xs">{row.email}</p></div> },
     { id: "role", label: "Role", accessor: (row) => row.role },
     {
       id: "status", label: "Status", accessor: (row) => row.status,
-      cell: (row) => <div className="flex flex-wrap items-center gap-1.5"><StatusBadge status={row.status} />{Boolean(row.setupPending) && <Badge variant="outline" className="border-warning/25 bg-warning/10 text-amber-700 dark:text-amber-300">Invite Pending</Badge>}</div>,
+      cell: (row) => <div className="flex flex-wrap items-center gap-1.5">
+        <StatusBadge status={row.status} />
+        {Boolean(row.setupPending) && <Badge variant="outline" className="border-warning/25 bg-warning/10 text-amber-700 dark:text-amber-300">Invite Pending</Badge>}
+        {!row.setupCompleted && !row.setupPending && <Badge variant="outline" className="border-danger/25 bg-danger/10 text-danger">Setup Never Completed</Badge>}
+        {Boolean(row.locked) && <Badge variant="outline" className="border-danger/25 bg-danger/10 text-danger"><Lock className="size-3" />Locked</Badge>}
+      </div>,
     },
     { id: "joined", label: "Joined", accessor: (row) => row.joined },
     { id: "last", label: "Last Active", accessor: (row) => row.lastActive ?? "Never" },
@@ -66,8 +80,9 @@ export function UsersPage() {
       cell: (row) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm"><MoreHorizontal /></Button></DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            {Boolean(row.setupPending) && <DropdownMenuItem onSelect={() => toast.info(`Invitation email was sent to ${row.email}`)}><Mail /> Invite pending</DropdownMenuItem>}
+          <DropdownMenuContent align="end" className="w-52">
+            {!row.setupCompleted && <DropdownMenuItem onSelect={() => setResendUser(row)}><RefreshCcw /> Resend setup link</DropdownMenuItem>}
+            {Boolean(row.locked) && <DropdownMenuItem onSelect={() => void unlockAccount(row.id)}><LockOpen /> Unlock account</DropdownMenuItem>}
             <DropdownMenuItem onSelect={() => void setStatusFor(row.id, "Active")}><UserCheck /> Activate</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => void setStatusFor(row.id, "Inactive")}><UserX /> Deactivate</DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -106,6 +121,14 @@ export function UsersPage() {
         />
       )}
       <ConfirmDialog open={Boolean(removeId)} onOpenChange={(open) => { if (!open) setRemoveId(undefined); }} title="Delete user?" description="The account will be deactivated and removed from active records." actionLabel="Delete" onConfirm={() => void (async () => { try { await adminApi(`/users/${removeId}`, { method: "DELETE" }); setRemoveId(undefined); toast.success("User deleted"); await load(); } catch (e) { toast.error(e instanceof Error ? e.message : "Unable to delete user"); } })()} />
+      <ConfirmDialog
+        open={Boolean(resendUser)}
+        onOpenChange={(open) => { if (!open) setResendUser(undefined); }}
+        title="Resend setup link?"
+        description={resendUser ? `${resendUser.name} hasn't completed account setup. Send a new setup link to ${resendUser.email}, or cancel and leave it as is.` : ""}
+        actionLabel="Resend"
+        onConfirm={() => { if (resendUser) { void resendInvite(resendUser.id); setResendUser(undefined); } }}
+      />
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import type { SendMailOptions } from "nodemailer";
+
 import { mailFrom, mailTransporter } from "../config/mail";
 
 export interface SendEmailOptions {
@@ -5,10 +7,11 @@ export interface SendEmailOptions {
   subject: string;
   text?: string;
   html?: string;
+  attachments?: SendMailOptions["attachments"];
 }
 
 export async function sendEmail(options: SendEmailOptions): Promise<void> {
-  const { to, subject, text, html } = options;
+  const { to, subject, text, html, attachments } = options;
   if (!text && !html) throw new Error("sendEmail requires either text or html content");
 
   await mailTransporter.sendMail({
@@ -17,5 +20,6 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
     subject,
     ...(text !== undefined ? { text } : {}),
     ...(html !== undefined ? { html } : {}),
+    ...(attachments !== undefined ? { attachments } : {}),
   });
 }

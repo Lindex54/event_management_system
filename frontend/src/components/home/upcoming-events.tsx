@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
-import { EventCard } from "@/components/home/event-card";
+import { PublicEventCard } from "@/components/events/public-event-card";
 import { Button } from "@/components/ui/button";
-import { upcomingEvents } from "@/data/events";
+import type { PublicEvent } from "@/lib/api/public-events";
 
-export function UpcomingEvents() {
+export function UpcomingEvents({ events }: { events: PublicEvent[] }) {
   return (
     <section id="upcoming" className="bg-surface py-18 sm:py-22">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -16,7 +16,7 @@ export function UpcomingEvents() {
             <p className="mt-3 max-w-2xl text-text-secondary">Plan ahead with events coming up across the city.</p>
           </div>
           <Button variant="outline" className="w-fit bg-surface" asChild>
-            <Link href="#">
+            <Link href="/events">
               Browse all
               <ArrowRight className="size-4" aria-hidden="true" />
             </Link>
@@ -24,8 +24,8 @@ export function UpcomingEvents() {
         </div>
 
         <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {upcomingEvents.map((event) => (
-            <EventCard key={event.id} event={event} />
+          {events.map((event) => (
+            <PublicEventCard key={event.id} event={event} />
           ))}
         </div>
       </div>

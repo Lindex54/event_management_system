@@ -1,8 +1,8 @@
 import { AlertCircle, Bell, CalendarClock } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { systemAlerts } from "@/data/admin-dashboard";
 import { cn } from "@/lib/utils";
+import type { DashboardAlert } from "@/types/admin";
 
 const icons = { alert: AlertCircle, bell: Bell, clock: CalendarClock };
 const tones = {
@@ -12,7 +12,7 @@ const tones = {
   success: "bg-success/10 text-success",
 };
 
-export function SystemAlerts() {
+export function SystemAlerts({ alerts }: { alerts: DashboardAlert[] }) {
   return (
     <Card className="shadow-none">
       <CardHeader>
@@ -20,7 +20,7 @@ export function SystemAlerts() {
         <CardDescription>Items that may need your attention</CardDescription>
       </CardHeader>
       <CardContent className="space-y-1">
-        {systemAlerts.map((alert) => {
+        {alerts.length ? alerts.map((alert) => {
           const Icon = icons[alert.icon];
           return (
             <div key={alert.id} className="flex gap-3 border-b border-border py-3 last:border-0">
@@ -33,7 +33,7 @@ export function SystemAlerts() {
               </div>
             </div>
           );
-        })}
+        }) : <p className="py-6 text-center text-sm text-text-secondary">Nothing needs your attention right now.</p>}
       </CardContent>
     </Card>
   );

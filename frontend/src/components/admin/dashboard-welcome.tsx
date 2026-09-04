@@ -1,17 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { CalendarPlus, UserPlus, UsersRound } from "lucide-react";
-import { toast } from "sonner";
 
 import { InvitePeopleDialog } from "@/components/admin/invite-people-dialog";
 import { CreateEventDialog } from "@/components/admin/create-event-dialog";
 import { Button } from "@/components/ui/button";
 
-export function DashboardWelcome() {
+const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+
+export function DashboardWelcome({ onEventSaved }: { onEventSaved?: () => void | Promise<void> }) {
   return (
     <section className="flex flex-col justify-between gap-5 xl:flex-row xl:items-center">
       <div>
-        <p className="text-sm font-medium text-primary">Thursday, September 3</p>
+        <p className="text-sm font-medium text-primary">{today}</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">
           Welcome back, Administrator
         </h1>
@@ -20,16 +22,16 @@ export function DashboardWelcome() {
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" className="bg-surface" onClick={() => toast.success("Add organizer form is ready for the next phase") }>
-          <UsersRound /> Add Organizer
+        <Button variant="outline" className="bg-surface" asChild>
+          <Link href="/admin/organizers"><UsersRound /> Add Organizer</Link>
         </Button>
-        <Button variant="outline" className="bg-surface" onClick={() => toast.success("Add user form is ready for the next phase") }>
-          <UserPlus /> Add User
+        <Button variant="outline" className="bg-surface" asChild>
+          <Link href="/admin/users"><UserPlus /> Add User</Link>
         </Button>
         <InvitePeopleDialog
           trigger={<Button variant="outline" className="bg-surface"><UserPlus /> Invite People</Button>}
         />
-        <CreateEventDialog trigger={<Button><CalendarPlus /> Create Event</Button>} />
+        <CreateEventDialog trigger={<Button><CalendarPlus /> Create Event</Button>} onSaved={onEventSaved} />
       </div>
     </section>
   );

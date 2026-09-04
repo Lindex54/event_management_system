@@ -5,26 +5,9 @@ import { adminSessionMaxAgeMs, createAdminSession } from "../services/admin-auth
 import { createUserSession, userSessionMaxAgeMs } from "../services/auth.service";
 import { claimFirstLoginWelcome, consumeSetupToken, formatRoleName, organizerApprovalMessage, organizerApprovalStatus, sendWelcomeEmail, validateSetupToken } from "../services/invitation.service";
 import { adminSessionCookieName, sessionCookieOptions, userSessionCookieName } from "../utils/cookies";
-import { hashPassword } from "../utils/password";
+import { hashPassword, passwordStrengthError } from "../utils/password";
 
 const router = Router();
-
-const passwordPattern = {
-  length: /.{8,}/,
-  upper: /[A-Z]/,
-  lower: /[a-z]/,
-  number: /[0-9]/,
-  special: /[^A-Za-z0-9]/,
-};
-
-function passwordError(password: string): string | null {
-  if (!passwordPattern.length.test(password)) return "Password must be at least 8 characters long";
-  if (!passwordPattern.upper.test(password)) return "Password must contain at least one uppercase letter";
-  if (!passwordPattern.lower.test(password)) return "Password must contain at least one lowercase letter";
-  if (!passwordPattern.number.test(password)) return "Password must contain at least one number";
-  if (!passwordPattern.special.test(password)) return "Password must contain at least one special character";
-  return null;
-}
 
 router.get("/setup-account", async (request, response) => {
   const token = typeof request.query.token === "string" ? request.query.token : "";
@@ -45,7 +28,7 @@ router.post("/setup-account", async (request, response) => {
   const confirmPassword = typeof request.body?.confirmPassword === "string" ? request.body.confirmPassword : "";
   if (!token) { response.status(400).json({ success: false, message: "A setup token is required" }); return; }
   if (password !== confirmPassword) { response.status(400).json({ success: false, message: "Passwords do not match" }); return; }
-  const strengthError = passwordError(password);
+  const strengthError = passwordStrengthError(password);
   if (strengthError) { response.status(400).json({ success: false, message: strengthError }); return; }
 
   try {

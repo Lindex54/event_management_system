@@ -5,6 +5,7 @@ import { uploadEventAgenda,uploadEventImage } from "../admin/uploads.routes";
 const router=Router();router.use(requireOrganizer);
 router.get("/dashboard",controller.getDashboard);router.get("/dashboard/registration-trends",controller.getTrends);
 router.get("/events",controller.listEvents);router.post("/events",controller.createEvent);router.get("/events/:id",controller.getEvent);router.put("/events/:id",controller.updateEvent);router.patch("/events/:id/cancel",controller.cancelEvent);
+router.get("/staff-options",controller.listStaffOptions);router.post("/staff-options",controller.inviteStaff);router.get("/events/:id/co-organizers",controller.getCoOrganizers);router.put("/events/:id/co-organizers",controller.setCoOrganizers);
 router.get("/registrations",controller.listRegistrations);router.patch("/registrations/:id/status",controller.updateRegistration);router.post("/registrations/:id/check-in",controller.checkIn);
 router.get("/attendees",controller.listAttendees);
 router.get("/schedule",controller.listSchedule);router.post("/schedule",controller.createSchedule);router.put("/schedule/:id",controller.updateSchedule);router.delete("/schedule/:id",controller.deleteSchedule);
