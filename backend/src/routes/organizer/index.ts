@@ -1,7 +1,7 @@
 import { Router } from "express";
 import * as controller from "../../controllers/organizer/organizer.controller";
 import { requireOrganizer } from "../../middleware/require-organizer";
-import { uploadEventImage } from "../admin/uploads.routes";
+import { uploadEventAgenda,uploadEventImage } from "../admin/uploads.routes";
 const router=Router();router.use(requireOrganizer);
 router.get("/dashboard",controller.getDashboard);router.get("/dashboard/registration-trends",controller.getTrends);
 router.get("/events",controller.listEvents);router.post("/events",controller.createEvent);router.get("/events/:id",controller.getEvent);router.put("/events/:id",controller.updateEvent);router.patch("/events/:id/cancel",controller.cancelEvent);
@@ -12,5 +12,5 @@ router.get("/speakers",controller.listSpeakers);router.post("/speakers",controll
 router.get("/venues",controller.listVenues);router.get("/invitations",controller.listInvitations);
 router.get("/notifications",controller.listNotifications);router.patch("/notifications/read-all",controller.readAllNotifications);router.patch("/notifications/:id/read",controller.readNotification);
 router.get("/reports",controller.getReport);router.get("/profile",controller.getProfile);router.put("/profile",controller.updateProfile);
-router.post("/uploads/event-image",uploadEventImage);
+router.post("/uploads/event-image",uploadEventImage);router.post("/uploads/event-agenda",uploadEventAgenda);
 export default router;

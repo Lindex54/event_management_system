@@ -8,6 +8,7 @@ import {
   getAdminSession,
   revokeAdminSession,
 } from "../services/admin-auth.service";
+import { claimFirstLoginWelcome, sendWelcomeEmail } from "../services/invitation.service";
 import {
   adminSessionCookieName,
   clearSessionCookieOptions,
@@ -34,6 +35,9 @@ router.post("/login", async (request, response) => {
     const token = await createAdminSession(administrator.id, request.ip, request.get("user-agent"));
     response.cookie(adminSessionCookieName, token, sessionCookieOptions(adminSessionMaxAgeMs));
     response.json({ success: true, message: "Administrator signed in", user: administrator });
+    claimFirstLoginWelcome(administrator.id).then((isFirst) => {
+      if (isFirst) void sendWelcomeEmail({ to: administrator.email, name: administrator.name, roleName: "System Administrator" }).catch((error) => console.error(`Welcome email failed (${databaseErrorCode(error)})`));
+    }).catch((error) => console.error(`First-login check failed (${databaseErrorCode(error)})`));
   } catch (error) {
     console.error(`Administrator login failed (${databaseErrorCode(error)})`);
     response.status(500).json({ success: false, message: "Unable to sign in right now" });

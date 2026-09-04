@@ -36,7 +36,12 @@ export function LoginForm() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email.trim(), password }) });
       const result = await response.json();
-      if (!response.ok || !result.success) { setErrors({ password: result.message ?? "Unable to sign in." }); return; }
+      if (!response.ok || !result.success) {
+        const message = result.message ?? "Unable to sign in.";
+        if (result.pending) { toast.warning(message, { duration: 8000 }); setErrors({}); return; }
+        setErrors({ password: message });
+        return;
+      }
       toast.success("Signed in successfully");
       const roles: string[] = result.data.roles ?? [];
       const destination = roles.includes("event-organizer")

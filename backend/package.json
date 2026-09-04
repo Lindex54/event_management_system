@@ -11,8 +11,10 @@
     "db:setup-auth": "tsx src/database/setup-auth-schema.ts",
     "db:create-temp-admin": "tsx src/database/create-temporary-admin.ts",
     "db:setup-organizer": "tsx src/database/setup-organizer-schema.ts",
+    "db:setup-onboarding": "tsx src/database/setup-onboarding-schema.ts",
     "mail:test": "tsx src/scripts/send-test-email.ts",
-    "db:seed-staff-attendee": "tsx src/scripts/seed-staff-attendee-test-data.ts"
+    "db:seed-staff-attendee": "tsx src/scripts/seed-staff-attendee-test-data.ts",
+    "db:seed-organizer": "tsx src/scripts/seed-organizer-test-data.ts"
   },
   "keywords": [],
   "author": "",

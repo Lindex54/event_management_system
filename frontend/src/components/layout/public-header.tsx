@@ -14,15 +14,15 @@ import {
 } from "@/components/ui/sheet";
 
 const navigation = [
-  { label: "Home", href: "#home" },
-  { label: "Events", href: "#events" },
-  { label: "About", href: "#about" },
-  { label: "Contact", href: "#contact" },
+  { label: "Home", href: "/" },
+  { label: "Events", href: "/events" },
+  { label: "About", href: "/about" },
+  { label: "Contact", href: "/contact" },
 ];
 
 function Brand() {
   return (
-    <Link href="#home" className="flex items-center gap-2.5" aria-label="Evently home">
+    <Link href="/" className="flex items-center gap-2.5" aria-label="Evently home">
       <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
         <CalendarDays className="size-5" aria-hidden="true" />
       </span>

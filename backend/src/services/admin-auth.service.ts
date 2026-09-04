@@ -12,6 +12,7 @@ interface AdminAccountRow extends RowDataPacket {
   passwordHash: string;
   firstName: string;
   lastName: string | null;
+  email: string;
 }
 
 interface AdminSessionRow extends RowDataPacket {
@@ -19,12 +20,14 @@ interface AdminSessionRow extends RowDataPacket {
   username: string;
   firstName: string;
   lastName: string | null;
+  email: string;
 }
 
 export interface AdminIdentity {
   id: number;
   username: string;
   name: string;
+  email: string;
 }
 
 function tokenHash(token: string): string {
@@ -36,13 +39,14 @@ function identity(row: AdminAccountRow | AdminSessionRow): AdminIdentity {
     id: "userId" in row ? row.userId : row.id,
     username: row.username,
     name: [row.firstName, row.lastName].filter(Boolean).join(" "),
+    email: row.email,
   };
 }
 
 export async function authenticateAdministrator(username: string, password: string): Promise<AdminIdentity | null> {
   const [rows] = await pool.query<AdminAccountRow[]>(
     `SELECT u.id, u.username, u.password_hash AS passwordHash,
-            p.first_name AS firstName, p.last_name AS lastName
+            p.first_name AS firstName, p.last_name AS lastName, p.email AS email
        FROM users AS u
        JOIN people AS p ON p.id = u.person_id
        JOIN user_roles AS ur ON ur.user_id = u.id
@@ -71,7 +75,7 @@ export async function createAdminSession(userId: number, ipAddress?: string, use
 
 export async function getAdminSession(token: string): Promise<AdminIdentity | null> {
   const [rows] = await pool.query<AdminSessionRow[]>(
-    `SELECT u.id AS userId, u.username, p.first_name AS firstName, p.last_name AS lastName
+    `SELECT u.id AS userId, u.username, p.first_name AS firstName, p.last_name AS lastName, p.email AS email
        FROM auth_sessions AS s
        JOIN users AS u ON u.id = s.user_id
        JOIN people AS p ON p.id = u.person_id

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { format } from "date-fns";
-import { ImagePlus, X } from "lucide-react";
+import { FileText, ImagePlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { CalendarWithTime } from "@/components/admin/shared/calendar-with-time";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ export type EventEditorRecord = {
   id: number; name: string; organizerId: number; venueId: number; theme?: string | null; description?: string | null;
   date: string; time?: string | null; endTime?: string | null; timezone: string; capacity: number; status: string;
   imageUrl?: string | null; imageAlt?: string | null;
+  agendaType?: "None" | "File" | "Url"; agendaUrl?: string | null; agendaFileName?: string | null; agendaFileType?: string | null;
 };
 type SelectOption = { id: number; name?: string; organization?: string };
 
@@ -34,6 +35,8 @@ export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpen
   const [timezone, setTimezone] = React.useState(event?.timezone ?? "Africa/Nairobi"); const [status, setStatus] = React.useState(event?.status ?? "Draft");
   const [imageUrl, setImageUrl] = React.useState(event?.imageUrl ?? ""); const [imageAlt, setImageAlt] = React.useState(event?.imageAlt ?? "");
   const [imageFile, setImageFile] = React.useState<File>(); const [imagePreview, setImagePreview] = React.useState("");
+  const [agendaType, setAgendaType] = React.useState(event?.agendaType ?? "None"); const [agendaUrl, setAgendaUrl] = React.useState(event?.agendaType === "Url" ? event?.agendaUrl ?? "" : "");
+  const [agendaFile, setAgendaFile] = React.useState<File>(); const [existingAgendaFileName, setExistingAgendaFileName] = React.useState(event?.agendaType === "File" ? event?.agendaFileName ?? "" : "");
   const [error, setError] = React.useState(""); const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
@@ -56,10 +59,21 @@ export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpen
     }
   }
 
+  function selectAgendaFile(inputEvent: React.ChangeEvent<HTMLInputElement>) {
+    const file = inputEvent.target.files?.[0];
+    if (!file) return;
+    const allowed = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) { setError("Choose a PDF, JPG, PNG, or WebP file for the agenda"); inputEvent.target.value = ""; return; }
+    if (file.size > 5 * 1024 * 1024) { setError("The agenda file must be smaller than 5 MB"); inputEvent.target.value = ""; return; }
+    setError(""); setAgendaFile(file); setExistingAgendaFileName("");
+  }
+
   async function submit(formEvent: React.FormEvent<HTMLFormElement>) {
     formEvent.preventDefault();
     if (!name.trim() || !organizerId || !venueId || !date || !Number(capacity)) { setError("Event name, organizer, venue, date and a positive capacity are required."); return; }
     if (startTime && endTime && endTime <= startTime) { setError("End time must be later than start time."); return; }
+    if (agendaType === "Url" && !agendaUrl.trim()) { setError("Provide an agenda URL, or switch the agenda type to None."); return; }
+    if (agendaType === "File" && !agendaFile && !existingAgendaFileName) { setError("Upload an agenda file, or switch the agenda type to None."); return; }
     setSaving(true); setError("");
     try {
       let savedImageUrl = imageUrl.trim();
@@ -71,10 +85,26 @@ export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpen
         savedImageUrl = upload.data?.imageUrl ?? "";
         if (!savedImageUrl) throw new Error("The server did not return the uploaded image path");
       }
+
+      let agendaPayload: { agendaType: string; agendaUrl: string | null; agendaFileName: string | null; agendaFileType: string | null } = { agendaType: "None", agendaUrl: null, agendaFileName: null, agendaFileType: null };
+      if (agendaType === "Url") {
+        agendaPayload = { agendaType: "Url", agendaUrl: agendaUrl.trim(), agendaFileName: null, agendaFileType: null };
+      } else if (agendaType === "File") {
+        if (agendaFile) {
+          const upload = await adminApi<{ agendaUrl: string; agendaFileType: string; agendaFileName: string }>("/uploads/event-agenda", {
+            method: "POST",
+            body: JSON.stringify({ dataUrl: await readAsDataUrl(agendaFile), originalName: agendaFile.name }),
+          });
+          agendaPayload = { agendaType: "File", agendaUrl: upload.data?.agendaUrl ?? null, agendaFileName: upload.data?.agendaFileName ?? null, agendaFileType: upload.data?.agendaFileType ?? null };
+        } else {
+          agendaPayload = { agendaType: "File", agendaUrl: event?.agendaUrl ?? null, agendaFileName: event?.agendaFileName ?? null, agendaFileType: event?.agendaFileType ?? null };
+        }
+      }
+
       await adminApi(`/events${event ? `/${event.id}` : ""}`, { method: event ? "PUT" : "POST", body: JSON.stringify({
         name: name.trim(), organizerId: Number(organizerId), venueId: Number(venueId), theme, description,
         date: format(date, "yyyy-MM-dd"), startTime: startTime || null, endTime: endTime || null, timezone,
-        capacity: Number(capacity), status, imageUrl: savedImageUrl, imageAlt,
+        capacity: Number(capacity), status, imageUrl: savedImageUrl, imageAlt, ...agendaPayload,
       }) });
       toast.success(event ? "Event updated" : "Event created"); await onSaved?.(); changeOpen(false);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to save event"); }
@@ -92,7 +122,26 @@ export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpen
     <Field label="Event Image URL (Optional)" id="event-image"><Input id="event-image" type="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://example.com/event.jpg" /></Field>
     <Field label="Image Description (Optional)" id="event-image-alt"><Input id="event-image-alt" value={imageAlt} onChange={(e) => setImageAlt(e.target.value)} placeholder="Describe the event image" /></Field>
     <Field label="Description (Optional)" id="event-description" span><Textarea id="event-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Tell attendees what to expect" /></Field>
-  </div><div><Label className="mb-2 block">Event Date *</Label><CalendarWithTime date={date} onDateChange={setDate} startTime={startTime} onStartTimeChange={setStartTime} endTime={endTime} onEndTimeChange={setEndTime} timezone={timezone} onTimezoneChange={setTimezone} /></div>{error && <p className="text-sm text-danger" role="alert">{error}</p>}<DialogFooter><Button type="button" variant="outline" onClick={() => changeOpen(false)} disabled={saving}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving…" : event ? "Save Changes" : "Create Event"}</Button></DialogFooter></form></DialogContent></Dialog>;
+  </div>
+
+  <div className="space-y-3 rounded-xl border border-border p-4">
+    <Label className="flex items-center gap-2"><FileText className="size-4 text-primary" />Agenda</Label>
+    <Select value={agendaType} onValueChange={(v) => setAgendaType(v as typeof agendaType)}>
+      <SelectTrigger className="h-10 w-full sm:w-64"><SelectValue /></SelectTrigger>
+      <SelectContent><SelectItem value="None">No agenda</SelectItem><SelectItem value="File">Upload agenda file</SelectItem><SelectItem value="Url">Provide agenda URL</SelectItem></SelectContent>
+    </Select>
+    {agendaType === "File" && (
+      <div>
+        <input id="agenda-file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="sr-only" onChange={selectAgendaFile} />
+        <label htmlFor="agenda-file" className="flex min-h-16 cursor-pointer items-center justify-center gap-3 rounded-xl border border-dashed border-input bg-background px-4 text-sm text-text-secondary transition-colors hover:border-primary hover:text-primary">
+          <FileText className="size-5" /><span>{agendaFile?.name || existingAgendaFileName || "Choose a PDF, JPG, PNG, or WebP file (maximum 5 MB)"}</span>
+        </label>
+      </div>
+    )}
+    {agendaType === "Url" && <Input type="url" value={agendaUrl} onChange={(e) => setAgendaUrl(e.target.value)} placeholder="https://example.com/agenda.pdf" className="h-10" />}
+  </div>
+
+  <div><Label className="mb-2 block">Event Date *</Label><CalendarWithTime date={date} onDateChange={setDate} startTime={startTime} onStartTimeChange={setStartTime} endTime={endTime} onEndTimeChange={setEndTime} timezone={timezone} onTimezoneChange={setTimezone} /></div>{error && <p className="text-sm text-danger" role="alert">{error}</p>}<DialogFooter><Button type="button" variant="outline" onClick={() => changeOpen(false)} disabled={saving}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving…" : event ? "Save Changes" : "Create Event"}</Button></DialogFooter></form></DialogContent></Dialog>;
 }
 
 function Field({ label, id, span, children }: { label: string; id: string; span?: boolean; children: React.ReactNode }) { return <div className={`space-y-2${span ? " sm:col-span-2" : ""}`}><Label htmlFor={id}>{label}</Label>{children}</div>; }

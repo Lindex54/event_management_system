@@ -1,15 +1,25 @@
 import Link from "next/link";
 import { CalendarDays } from "lucide-react";
 
-const exploreLinks = ["Browse Events", "Featured Events", "Happening Soon", "Subscribe for Updates"];
-const supportLinks = ["About Us", "Contact", "Help Center", "Privacy"];
+const exploreLinks = [
+  { label: "Browse Events", href: "/events" },
+  { label: "Featured Events", href: "/#featured" },
+  { label: "Happening Soon", href: "/#happening-soon" },
+  { label: "Subscribe for Updates", href: "/#subscribe" },
+];
+const supportLinks = [
+  { label: "About Us", href: "/about" },
+  { label: "Contact", href: "/contact" },
+  { label: "Help Center", href: "/contact" },
+  { label: "Privacy", href: "/contact" },
+];
 
 export function PublicFooter() {
   return (
-    <footer id="contact" className="bg-navy text-white">
+    <footer className="bg-navy text-white">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-2 lg:grid-cols-4 lg:px-8">
         <div className="lg:col-span-2">
-          <Link href="#home" className="inline-flex items-center gap-2.5">
+          <Link href="/" className="inline-flex items-center gap-2.5">
             <span className="flex size-9 items-center justify-center rounded-lg bg-primary">
               <CalendarDays className="size-5" aria-hidden="true" />
             </span>
@@ -35,12 +45,9 @@ export function PublicFooter() {
           <h2 className="text-sm font-semibold">Explore</h2>
           <ul className="mt-4 space-y-3">
             {exploreLinks.map((link) => (
-              <li key={link}>
-                <Link
-                  href={link === "Subscribe for Updates" ? "#subscribe" : "#events"}
-                  className="text-sm text-slate-300 transition-colors hover:text-white"
-                >
-                  {link}
+              <li key={link.label}>
+                <Link href={link.href} className="text-sm text-slate-300 transition-colors hover:text-white">
+                  {link.label}
                 </Link>
               </li>
             ))}
@@ -51,9 +58,9 @@ export function PublicFooter() {
           <h2 className="text-sm font-semibold">Support</h2>
           <ul className="mt-4 space-y-3">
             {supportLinks.map((link) => (
-              <li key={link}>
-                <Link href="#" className="text-sm text-slate-300 transition-colors hover:text-white">
-                  {link}
+              <li key={link.label}>
+                <Link href={link.href} className="text-sm text-slate-300 transition-colors hover:text-white">
+                  {link.label}
                 </Link>
               </li>
             ))}

@@ -26,7 +26,7 @@ export function FormDialog({ trigger, title, description, fields, submitLabel = 
   fields: FormField[];
   submitLabel?: string;
   successMessage: string;
-  onSave?: (values: Record<string, string>) => void | Promise<void>;
+  onSave?: (values: Record<string, string>) => void | string | Promise<void | string>;
   initialValues?: Record<string, string>;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -57,8 +57,8 @@ export function FormDialog({ trigger, title, description, fields, submitLabel = 
     }
     try {
       setSaving(true);
-      await onSave?.(values);
-      toast.success(successMessage);
+      const result = await onSave?.(values);
+      toast.success(result || successMessage);
       setValues({}); setError(""); setOpen(false);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to save this record.");
