@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "db:setup-auth": "tsx src/database/setup-auth-schema.ts",
     "db:create-temp-admin": "tsx src/database/create-temporary-admin.ts",
-    "db:setup-organizer": "tsx src/database/setup-organizer-schema.ts"
+    "db:setup-organizer": "tsx src/database/setup-organizer-schema.ts",
+    "mail:test": "tsx src/scripts/send-test-email.ts",
+    "db:seed-staff-attendee": "tsx src/scripts/seed-staff-attendee-test-data.ts"
   },
   "keywords": [],
   "author": "",
@@ -20,12 +22,14 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "mysql2": "^3.24.3"
+    "mysql2": "^3.24.3",
+    "nodemailer": "^9.1.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^26.4.1",
+    "@types/nodemailer": "^8.0.1",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2"
   }

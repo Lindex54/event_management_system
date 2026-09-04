@@ -1,0 +1,5 @@
+import type { RequestHandler } from "express";
+import { databaseErrorCode } from "../config/database";
+import { getUserSession } from "../services/auth.service";
+import { readCookie,userSessionCookieName } from "../utils/cookies";
+export const requireStaff:RequestHandler=async(request,response,next)=>{const token=readCookie(request.headers.cookie,userSessionCookieName);if(!token){response.status(401).json({success:false,message:"Staff sign in is required"});return;}try{const user=await getUserSession(token);if(!user){response.status(401).json({success:false,message:"Staff session is invalid or expired"});return;}if(!user.roles.includes("event-staff")){response.status(403).json({success:false,message:"An active Event Staff account is required"});return;}response.locals.staff={userId:user.id,name:user.name,email:user.email};next();}catch(error){console.error(`Staff authorization failed (${databaseErrorCode(error)})`);response.status(503).json({success:false,message:"Unable to verify staff access"});}};

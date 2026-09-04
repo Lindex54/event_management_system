@@ -1,12 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+import { API_BASE_URL } from "@/lib/api/config";
+
 const adminLoginPath = "/admin/login";
 
 export async function proxy(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith("/organizer")) {
     const cookie=request.headers.get("cookie");
     if(!cookie)return NextResponse.redirect(new URL("/login",request.url));
-    try{const response=await fetch(`${process.env.NEXT_PUBLIC_API_URL??"http://localhost:5000"}/api/auth/session`,{headers:{cookie},cache:"no-store"});if(response.ok){const result=await response.json();if(result.data?.roles?.includes("event-organizer"))return NextResponse.next();}}catch{}
+    try{const response=await fetch(`${API_BASE_URL}/api/auth/session`,{headers:{cookie},cache:"no-store"});if(response.ok){const result=await response.json();if(result.data?.roles?.includes("event-organizer"))return NextResponse.next();}}catch{}
     return NextResponse.redirect(new URL("/login",request.url));
   }
   if (request.nextUrl.pathname === adminLoginPath) return NextResponse.next();
@@ -16,7 +18,7 @@ export async function proxy(request: NextRequest) {
 
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000"}/api/auth/admin/session`,
+      `${API_BASE_URL}/api/auth/admin/session`,
       { headers: { cookie }, cache: "no-store" },
     );
     if (response.ok) return NextResponse.next();

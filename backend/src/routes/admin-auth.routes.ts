@@ -8,7 +8,12 @@ import {
   getAdminSession,
   revokeAdminSession,
 } from "../services/admin-auth.service";
-import { adminSessionCookieName, readCookie } from "../utils/cookies";
+import {
+  adminSessionCookieName,
+  clearSessionCookieOptions,
+  readCookie,
+  sessionCookieOptions,
+} from "../utils/cookies";
 
 const router = Router();
 
@@ -27,13 +32,7 @@ router.post("/login", async (request, response) => {
       return;
     }
     const token = await createAdminSession(administrator.id, request.ip, request.get("user-agent"));
-    response.cookie(adminSessionCookieName, token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: adminSessionMaxAgeMs,
-      path: "/",
-    });
+    response.cookie(adminSessionCookieName, token, sessionCookieOptions(adminSessionMaxAgeMs));
     response.json({ success: true, message: "Administrator signed in", user: administrator });
   } catch (error) {
     console.error(`Administrator login failed (${databaseErrorCode(error)})`);
@@ -50,7 +49,7 @@ router.get("/session", async (request, response) => {
   try {
     const administrator = await getAdminSession(token);
     if (!administrator) {
-      response.clearCookie(adminSessionCookieName, { path: "/" });
+      response.clearCookie(adminSessionCookieName, clearSessionCookieOptions());
       response.status(401).json({ success: false, message: "Administrator session is invalid or expired" });
       return;
     }
@@ -68,7 +67,7 @@ router.post("/logout", async (request, response) => {
   } catch (error) {
     console.error(`Administrator logout failed (${databaseErrorCode(error)})`);
   }
-  response.clearCookie(adminSessionCookieName, { path: "/" });
+  response.clearCookie(adminSessionCookieName, clearSessionCookieOptions());
   response.json({ success: true, message: "Administrator signed out" });
 });
 

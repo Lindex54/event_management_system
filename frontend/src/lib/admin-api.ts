@@ -1,4 +1,4 @@
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+import { API_BASE_URL } from "@/lib/api/config";
 
 interface ApiEnvelope<T> {
   success: boolean;
@@ -8,7 +8,7 @@ interface ApiEnvelope<T> {
 }
 
 export async function adminApi<T>(path: string, init?: RequestInit): Promise<ApiEnvelope<T>> {
-  const response = await fetch(`${apiBaseUrl}/api/admin${path}`, {
+  const response = await fetch(`${API_BASE_URL}/api/admin${path}`, {
     ...init,
     credentials: "include",
     headers: { "Content-Type": "application/json", ...init?.headers },

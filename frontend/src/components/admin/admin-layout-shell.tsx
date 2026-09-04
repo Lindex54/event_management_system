@@ -7,6 +7,7 @@ import { ShieldCheck } from "lucide-react";
 
 import { AdminHeader } from "@/components/admin/admin-header";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
+import { API_BASE_URL } from "@/lib/api/config";
 
 export function AdminLayoutShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -17,7 +18,7 @@ export function AdminLayoutShell({ children }: { children: ReactNode }) {
   React.useEffect(() => {
     if (loginPage) return;
     const controller = new AbortController();
-    void fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000"}/api/auth/admin/session`, {
+    void fetch(`${API_BASE_URL}/api/auth/admin/session`, {
       credentials: "include",
       signal: controller.signal,
     }).then((response) => {

@@ -10,6 +10,7 @@ import { PasswordField } from "@/components/auth/password-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { API_BASE_URL } from "@/lib/api/config";
 
 export function AdminLoginForm() {
   const router = useRouter();
@@ -28,7 +29,7 @@ export function AdminLoginForm() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000"}/api/auth/admin/login`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/admin/login`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

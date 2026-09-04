@@ -1,5 +1,5 @@
 import cors from "cors";
-import express from "express";
+import express, { type ErrorRequestHandler } from "express";
 
 import { databaseErrorCode, pool } from "./config/database";
 import adminAuthRouter from "./routes/admin-auth.routes";
@@ -11,11 +11,25 @@ import registrationsRouter from "./routes/admin/registrations.routes";
 import uploadsRouter from "./routes/admin/uploads.routes";
 import venuesRouter from "./routes/admin/venues.routes";
 import organizerRouter from "./routes/organizer";
+import staffRouter from "./routes/staff";
+import attendeeRouter from "./routes/attendee";
 
 const app = express();
 
+// Hostinger terminates HTTPS at its reverse proxy. Trust the first proxy hop so
+// Express reports the original protocol and client address correctly.
+app.set("trust proxy", 1);
+
+const frontendUrl = process.env.FRONTEND_URL?.trim() || "http://localhost:3000";
+let frontendOrigin: string;
+try {
+  frontendOrigin = new URL(frontendUrl).origin;
+} catch {
+  throw new Error("FRONTEND_URL must be a valid absolute URL");
+}
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL ?? "http://localhost:3000",
+  origin: frontendOrigin,
   credentials: true,
 }));
 app.use(express.json({ limit: "8mb" }));
@@ -30,6 +44,8 @@ app.use("/api/admin/attendees", attendeesRouter);
 app.use("/api/admin/organizers", organizersRouter);
 app.use("/api/admin/venues", venuesRouter);
 app.use("/api/organizer", organizerRouter);
+app.use("/api/staff", staffRouter);
+app.use("/api/attendee", attendeeRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({
@@ -53,5 +69,16 @@ app.get("/api/db-health", async (_req, res) => {
     });
   }
 });
+
+const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
+  const errorName = error instanceof Error ? error.name : "UnknownError";
+  console.error(`Unhandled request error (${errorName})`);
+  response.status(500).json({
+    success: false,
+    message: "An unexpected server error occurred",
+  });
+};
+
+app.use(errorHandler);
 
 export default app;

@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { API_BASE_URL } from "@/lib/api/config";
 import {
   Sheet,
   SheetContent,
@@ -32,7 +33,7 @@ export function AdminHeader() {
 
   async function signOut() {
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000"}/api/auth/admin/logout`, {
+      await fetch(`${API_BASE_URL}/api/auth/admin/logout`, {
         method: "POST",
         credentials: "include",
       });

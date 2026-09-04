@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { API_BASE_URL } from "@/lib/api/config";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -33,11 +34,19 @@ export function LoginForm() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000"}/api/auth/login`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email.trim(), password }) });
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email.trim(), password }) });
       const result = await response.json();
       if (!response.ok || !result.success) { setErrors({ password: result.message ?? "Unable to sign in." }); return; }
       toast.success("Signed in successfully");
-      router.replace(result.data.roles.includes("event-organizer") ? "/organizer" : "/home");
+      const roles: string[] = result.data.roles ?? [];
+      const destination = roles.includes("event-organizer")
+        ? "/organizer"
+        : roles.includes("event-staff")
+        ? "/staff"
+        : roles.includes("attendee")
+        ? "/attendee"
+        : "/home";
+      router.replace(destination);
       router.refresh();
     } catch { setErrors({ password: "The authentication server is unavailable." }); }
     finally { setLoading(false); }

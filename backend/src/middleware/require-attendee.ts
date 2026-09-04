@@ -1,0 +1,5 @@
+import type { RequestHandler } from "express";
+import { databaseErrorCode } from "../config/database";
+import { getUserSession } from "../services/auth.service";
+import { readCookie,userSessionCookieName } from "../utils/cookies";
+export const requireAttendee:RequestHandler=async(request,response,next)=>{const token=readCookie(request.headers.cookie,userSessionCookieName);if(!token){response.status(401).json({success:false,message:"Sign in is required"});return;}try{const user=await getUserSession(token);if(!user){response.status(401).json({success:false,message:"Session is invalid or expired"});return;}if(!user.roles.includes("attendee")||!user.attendeeId){response.status(403).json({success:false,message:"An active Attendee account is required"});return;}response.locals.attendee={userId:user.id,attendeeId:user.attendeeId,name:user.name,email:user.email};next();}catch(error){console.error(`Attendee authorization failed (${databaseErrorCode(error)})`);response.status(503).json({success:false,message:"Unable to verify attendee access"});}};
