@@ -41,7 +41,7 @@ export function AdminLoginForm() {
         return;
       }
       toast.success("Welcome to the administrator dashboard");
-      router.replace("/admin/dashboard");
+      router.replace("/admin");
       router.refresh();
     } catch {
       toast.error("The authentication server is unavailable. Make sure the backend is running.");

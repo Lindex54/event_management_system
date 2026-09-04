@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/lib/api/config";
+import { BACKEND_ORIGIN } from "@/lib/api/server-config";
 
 export interface PublicEvent {
   id: number;
@@ -31,14 +31,14 @@ export interface PublicEventDetail extends PublicEvent {
 }
 
 export async function listPublicEvents(): Promise<PublicEvent[]> {
-  const response = await fetch(`${API_BASE_URL}/api/events`, { cache: "no-store" });
+  const response = await fetch(`${BACKEND_ORIGIN}/api/events`, { cache: "no-store" });
   const result = await response.json();
   if (!response.ok || !result.success) throw new Error(result.message ?? "Unable to load events");
   return result.data;
 }
 
 export async function getPublicEvent(slug: string): Promise<PublicEventDetail | null> {
-  const response = await fetch(`${API_BASE_URL}/api/events/${encodeURIComponent(slug)}`, { cache: "no-store" });
+  const response = await fetch(`${BACKEND_ORIGIN}/api/events/${encodeURIComponent(slug)}`, { cache: "no-store" });
   if (response.status === 404) return null;
   const result = await response.json();
   if (!response.ok || !result.success) throw new Error(result.message ?? "Unable to load this event");
