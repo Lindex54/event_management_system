@@ -54,3 +54,10 @@ export function databaseErrorCode(error: unknown): string {
   }
   return "UNKNOWN_DATABASE_ERROR";
 }
+
+export function databaseErrorSqlMessage(error: unknown): string | null {
+  if (typeof error === "object" && error !== null && "sqlMessage" in error && typeof error.sqlMessage === "string") {
+    return error.sqlMessage;
+  }
+  return null;
+}

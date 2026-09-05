@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { databaseErrorCode } from "../config/database";
+import { databaseErrorCode, databaseErrorSqlMessage } from "../config/database";
 import {
   adminSessionMaxAgeMs,
   authenticateAdministrator,
@@ -44,7 +44,9 @@ router.post("/login", async (request, response) => {
       if (isFirst) void sendWelcomeEmail({ to: administrator.email, name: administrator.name, roleName: "System Administrator" }).catch((error) => console.error(`Welcome email failed (${databaseErrorCode(error)})`));
     }).catch((error) => console.error(`First-login check failed (${databaseErrorCode(error)})`));
   } catch (error) {
-    console.error(`Administrator login failed (${databaseErrorCode(error)})`);
+    const code = databaseErrorCode(error);
+    const sqlMessage = code === "ER_BAD_FIELD_ERROR" ? databaseErrorSqlMessage(error) : null;
+    console.error(`Administrator login failed (${code})${sqlMessage ? `: ${sqlMessage}` : ""}`);
     response.status(500).json({ success: false, message: "Unable to sign in right now" });
   }
 });

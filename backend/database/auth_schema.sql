@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS users (
     person_id BIGINT UNSIGNED NOT NULL,
     username VARCHAR(100) NULL,
     password_hash VARCHAR(255) NOT NULL,
+    failed_login_attempts INT UNSIGNED NOT NULL DEFAULT 0,
+    locked_at DATETIME NULL DEFAULT NULL,
     status ENUM('Active', 'Inactive') NOT NULL DEFAULT 'Active',
     email_verified_at TIMESTAMP NULL DEFAULT NULL,
     password_reset_token_hash VARCHAR(255) NULL,
