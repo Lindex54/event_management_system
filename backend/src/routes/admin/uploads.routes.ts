@@ -1,9 +1,9 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { Router } from "express";
 import type { RequestHandler } from "express";
+import type { ResultSetHeader } from "mysql2/promise";
 
+import { databaseErrorCode, databaseErrorSqlMessage, pool } from "../../config/database";
 import { requireAdmin } from "../../middleware/require-admin";
 
 const router = Router();
@@ -16,6 +16,17 @@ const imageTypes = new Map([
   ["image/gif", "gif"],
 ]);
 const maximumImageBytes = 5 * 1024 * 1024;
+
+async function storeFile(category:"EventImage"|"EventAgenda",originalName:string,mimeType:string,data:Buffer):Promise<string>{
+  const storageKey=randomBytes(24).toString("hex");
+  await pool.execute<ResultSetHeader>("INSERT INTO uploaded_files(storage_key,category,original_name,mime_type,file_size,file_data)VALUES(?,?,?,?,?,?)",[storageKey,category,originalName,mimeType,data.length,data]);
+  return `/api/files/${storageKey}`;
+}
+
+function logUploadError(action:string,error:unknown){
+  const code=databaseErrorCode(error),sqlMessage=databaseErrorSqlMessage(error);
+  console.error(`${action} failed (${code})${sqlMessage?`: ${sqlMessage}`:""}`);
+}
 
 export const uploadEventImage: RequestHandler = async (request, response) => {
   const dataUrl = typeof request.body?.dataUrl === "string" ? request.body.dataUrl : "";
@@ -33,14 +44,11 @@ export const uploadEventImage: RequestHandler = async (request, response) => {
   }
 
   try {
-    const fileName = `${Date.now()}-${randomBytes(8).toString("hex")}.${extension}`;
-    const directory = path.resolve(process.cwd(), "uploads", "events");
-    await mkdir(directory, { recursive: true });
-    await writeFile(path.join(directory, fileName), image, { flag: "wx" });
-    const imageUrl = `/uploads/events/${fileName}`;
+    const originalName=typeof request.body?.originalName==="string"?request.body.originalName.slice(0,255):"";
+    const imageUrl=await storeFile("EventImage",originalName||`event-image.${extension}`,match[1]!,image);
     response.status(201).json({ success: true, message: "Event image uploaded", data: { imageUrl } });
   } catch (error) {
-    console.error("Event image upload failed", error);
+    logUploadError("Event image upload",error);
     response.status(500).json({ success: false, message: "Unable to save the event image" });
   }
 };
@@ -73,14 +81,11 @@ export const uploadEventAgenda: RequestHandler = async (request, response) => {
   }
 
   try {
-    const fileName = `${Date.now()}-${randomBytes(8).toString("hex")}.${extension}`;
-    const directory = path.resolve(process.cwd(), "uploads", "agendas");
-    await mkdir(directory, { recursive: true });
-    await writeFile(path.join(directory, fileName), file, { flag: "wx" });
-    const agendaUrl = `/uploads/agendas/${fileName}`;
-    response.status(201).json({ success: true, message: "Agenda file uploaded", data: { agendaUrl, agendaFileType: mimeType, agendaFileName: originalName || fileName } });
+    const agendaFileName=originalName||`event-agenda.${extension}`;
+    const agendaUrl=await storeFile("EventAgenda",agendaFileName,mimeType,file);
+    response.status(201).json({ success: true, message: "Agenda file uploaded", data: { agendaUrl, agendaFileType: mimeType, agendaFileName } });
   } catch (error) {
-    console.error("Agenda upload failed", error);
+    logUploadError("Agenda upload",error);
     response.status(500).json({ success: false, message: "Unable to save the agenda file" });
   }
 };

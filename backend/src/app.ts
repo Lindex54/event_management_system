@@ -20,6 +20,7 @@ import organizerRouter from "./routes/organizer";
 import staffRouter from "./routes/staff";
 import attendeeRouter from "./routes/attendee";
 import discussionRouter from "./routes/discussion.routes";
+import filesRouter from "./routes/files.routes";
 
 const app = express();
 
@@ -47,6 +48,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/auth", setupAccountRouter);
 app.use("/api/auth", passwordResetRouter);
 app.use("/api/events", publicEventsRouter);
+app.use("/api/files", filesRouter);
 app.use("/api/admin/dashboard", dashboardRouter);
 app.use("/api/admin/events", eventsRouter);
 app.use("/api/admin/registrations", registrationsRouter);

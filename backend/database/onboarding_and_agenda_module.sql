@@ -32,3 +32,16 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS agenda_type ENUM('None','File','Url'
 ALTER TABLE events ADD COLUMN IF NOT EXISTS agenda_url VARCHAR(2048) NULL DEFAULT NULL AFTER agenda_type;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS agenda_file_name VARCHAR(255) NULL DEFAULT NULL AFTER agenda_url;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS agenda_file_type VARCHAR(120) NULL DEFAULT NULL AFTER agenda_file_name;
+
+CREATE TABLE IF NOT EXISTS uploaded_files (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    storage_key CHAR(48) NOT NULL,
+    category ENUM('EventImage', 'EventAgenda') NOT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    mime_type VARCHAR(120) NOT NULL,
+    file_size INT UNSIGNED NOT NULL,
+    file_data MEDIUMBLOB NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_uploaded_files_storage_key UNIQUE (storage_key),
+    INDEX idx_uploaded_files_category_created (category, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
