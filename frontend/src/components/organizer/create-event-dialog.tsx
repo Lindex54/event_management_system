@@ -44,8 +44,10 @@ export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpen
   const [theme, setTheme] = React.useState(event?.theme ?? ""); const [description, setDescription] = React.useState(event?.description ?? ""); const [capacity, setCapacity] = React.useState(event ? String(event.capacity) : "");
   const [date, setDate] = React.useState<Date | undefined>(event?.date ? new Date(`${event.date.slice(0, 10)}T00:00:00`) : undefined); const [startTime, setStartTime] = React.useState(event?.time ?? ""); const [endTime, setEndTime] = React.useState(event?.endTime ?? "");
   const [timezone, setTimezone] = React.useState(event?.timezone ?? "Africa/Nairobi"); const [status, setStatus] = React.useState(event?.status ?? "Draft");
-  const [imageUrl, setImageUrl] = React.useState(event?.imageUrl ?? ""); const [imageAlt, setImageAlt] = React.useState(event?.imageAlt ?? "");
+  const initialImageUrl = event?.imageUrl ?? "";
+  const [imageUrl, setImageUrl] = React.useState(isManagedImageUrl(initialImageUrl) ? "" : initialImageUrl); const [imageAlt, setImageAlt] = React.useState(event?.imageAlt ?? "");
   const [imageFile, setImageFile] = React.useState<File>(); const [imagePreview, setImagePreview] = React.useState("");
+  const [existingImageUrl, setExistingImageUrl] = React.useState(isManagedImageUrl(initialImageUrl) ? initialImageUrl : "");
   const [agendaType, setAgendaType] = React.useState(event?.agendaType ?? "None"); const [agendaUrl, setAgendaUrl] = React.useState(event?.agendaType === "Url" ? event?.agendaUrl ?? "" : "");
   const [agendaFile, setAgendaFile] = React.useState<File>(); const [existingAgendaFileName, setExistingAgendaFileName] = React.useState(event?.agendaType === "File" ? event?.agendaFileName ?? "" : "");
   const [error, setError] = React.useState(""); const [saving, setSaving] = React.useState(false);
@@ -88,6 +90,8 @@ export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpen
       setError("");
       setImagePreview(await validateImage(file));
       setImageFile(file);
+      setExistingImageUrl("");
+      setImageUrl("");
     } catch (reason) {
       setImageFile(undefined); setImagePreview(""); inputEvent.target.value = "";
       setError(reason instanceof Error ? reason.message : "Unable to use the selected image");
@@ -125,7 +129,7 @@ export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpen
         : Promise.resolve(null);
       const [imageUpload, agendaUpload] = await Promise.all([imageUploadPromise, agendaUploadPromise]);
 
-      let savedImageUrl = imageUrl.trim();
+      let savedImageUrl = imageUrl.trim() || existingImageUrl;
       if (imageUpload) {
         savedImageUrl = imageUpload.imageUrl ?? "";
         if (!savedImageUrl) throw new Error("The server did not return the uploaded image path");
@@ -158,14 +162,15 @@ export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpen
     finally { setSaving(false); }
   }
 
+  const displayedImage = imagePreview || existingImageUrl || (isExternalImageUrl(imageUrl) ? imageUrl : "");
   return <Dialog open={open} onOpenChange={changeOpen}>{trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}<DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-3xl"><DialogHeader><DialogTitle className="text-lg">{event ? "Edit Event" : "Create Event"}</DialogTitle><DialogDescription>Add the event details, date and optional time information.</DialogDescription></DialogHeader><form onSubmit={submit} className="space-y-5"><div className="grid gap-4 sm:grid-cols-2">
     <Field label="Event Name *" id="event-name" span><Input id="event-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Innovation Summit 2026" /></Field>
     <Field label="Venue *" id="event-venue"><Select value={venueId} onValueChange={setVenueId}><SelectTrigger id="event-venue" className="h-10 w-full"><SelectValue placeholder="Select venue" /></SelectTrigger><SelectContent>{venues.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></Field>
     <Field label="Capacity *" id="event-capacity"><Input id="event-capacity" type="number" min="1" value={capacity} onChange={(e) => setCapacity(e.target.value)} placeholder="e.g. 250" /></Field>
     <Field label="Event Theme (Optional)" id="event-theme"><Input id="event-theme" value={theme} onChange={(e) => setTheme(e.target.value)} placeholder="e.g. Innovation for everyone" /></Field>
     <Field label="Status *" id="event-status"><Select value={status} onValueChange={setStatus}><SelectTrigger id="event-status" className="h-10 w-full"><SelectValue /></SelectTrigger><SelectContent>{["Draft", "Upcoming", "Active", "Completed", "Cancelled"].map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></Field>
-    <Field label="Upload Event Image (Optional)" id="event-image-file" span><input id="event-image-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" onChange={(inputEvent) => void selectImage(inputEvent)} /><label htmlFor="event-image-file" className="flex min-h-20 cursor-pointer items-center justify-center gap-3 rounded-xl border border-dashed border-input bg-background px-4 text-sm text-text-secondary transition-colors hover:border-primary hover:text-primary"><ImagePlus className="size-5" /><span>{imageFile ? imageFile.name : "Choose an image from your device (JPG, PNG, WebP or GIF; maximum 5 MB)"}</span></label>{imagePreview && <div className="relative h-44 overflow-hidden rounded-xl border border-border bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(imagePreview)})` }}><Button type="button" variant="secondary" size="icon-sm" className="absolute right-2 top-2" onClick={() => { setImageFile(undefined); setImagePreview(""); }} aria-label="Remove selected image"><X /></Button></div>}<p className="text-xs text-text-secondary">A device image takes priority over the URL below.</p></Field>
-    <Field label="Event Image URL (Optional)" id="event-image"><Input id="event-image" type="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://example.com/event.jpg" /></Field>
+    <Field label="Upload Event Image (Optional)" id="event-image-file" span><input id="event-image-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" onChange={(inputEvent) => void selectImage(inputEvent)} /><label htmlFor="event-image-file" className="flex min-h-20 cursor-pointer items-center justify-center gap-3 rounded-xl border border-dashed border-input bg-background px-4 text-sm text-text-secondary transition-colors hover:border-primary hover:text-primary"><ImagePlus className="size-5" /><span>{imageFile?.name || (existingImageUrl ? "Current uploaded image — choose another file to replace it" : imageUrl ? "Using the image URL below" : "Choose an image from your device (JPG, PNG, WebP or GIF; maximum 5 MB)")}</span></label>{displayedImage && <div className="relative h-44 overflow-hidden rounded-xl border border-border bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(displayedImage)})` }}><Button type="button" variant="secondary" size="icon-sm" className="absolute right-2 top-2" onClick={() => { setImageFile(undefined); setImagePreview(""); setExistingImageUrl(""); setImageUrl(""); }} aria-label="Remove event image"><X /></Button></div>}<p className="text-xs text-text-secondary">Choose either a device upload or an external image URL.</p></Field>
+    <Field label="Event Image URL (Optional)" id="event-image"><Input id="event-image" type="url" value={imageUrl} onChange={(e) => { const next = e.target.value; setImageUrl(next); if (next.trim()) { setImageFile(undefined); setImagePreview(""); setExistingImageUrl(""); } }} placeholder="https://example.com/event.jpg" disabled={Boolean(imageFile || existingImageUrl)} />{existingImageUrl && <p className="text-xs text-text-secondary">Remove the current uploaded image above before switching to an external URL.</p>}</Field>
     <Field label="Image Description (Optional)" id="event-image-alt"><Input id="event-image-alt" value={imageAlt} onChange={(e) => setImageAlt(e.target.value)} placeholder="Describe the event image" /></Field>
     <Field label="Description (Optional)" id="event-description" span><Textarea id="event-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Tell attendees what to expect" /></Field>
   </div>
@@ -237,4 +242,23 @@ async function validateImage(file: File): Promise<string> {
   if (!allowed.includes(file.type)) throw new Error("Choose a JPG, PNG, WebP, or GIF image");
   if (file.size > 5 * 1024 * 1024) throw new Error("The event image must be smaller than 5 MB");
   return await readAsDataUrl(file);
+}
+
+function isManagedImageUrl(value: string): boolean {
+  if (value.startsWith("/uploads/") || value.startsWith("/api/files/")) return true;
+  try {
+    const path = new URL(value).pathname;
+    return path.startsWith("/uploads/") || path.startsWith("/api/files/");
+  } catch {
+    return false;
+  }
+}
+
+function isExternalImageUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
