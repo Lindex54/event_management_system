@@ -4,7 +4,7 @@ import * as React from "react";import { useSearchParams } from "next/navigation"
 
 interface EventOption{id:number;name:string;}
 interface Speaker{id:number;name:string;eventId:number;}
-interface ScheduleItem{id:number;eventId:number;event:string;speakerId:number|null;speaker:string;title:string;description:string|null;date:string;startTime:string;endTime:string|null;room:string|null;sortOrder:number;}
+interface ScheduleItem{id:number;eventId:number;event:string;speakerId:number|null;speaker:string;title:string;description:string|null;date:string;startTime:string;endTime:string|null;room:string|null;sortOrder:number;createdBy?:string|null;createdByRole?:string|null;}
 
 const emptyForm={id:0,eventId:"",speakerId:"none",title:"",description:"",date:undefined as Date|undefined,startTime:"",endTime:"",room:""};
 
@@ -91,6 +91,7 @@ export function OrganizerSchedulePage(){
                         <span className="flex items-center gap-1"><Clock className="size-3.5"/>{item.startTime}{item.endTime?` – ${item.endTime}`:""}</span>
                         {item.room && <span className="flex items-center gap-1"><MapPin className="size-3.5"/>{item.room}</span>}
                         {item.speaker && <span className="flex items-center gap-1"><Mic2 className="size-3.5"/>{item.speaker}</span>}
+                        {item.createdByRole==="Admin" && <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">Added by Admin</span>}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm"><MoreHorizontal/></Button></DropdownMenuTrigger>
                           <DropdownMenuContent align="end">

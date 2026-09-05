@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Bell,
+  CalendarClock,
   CalendarDays,
   ClipboardList,
   History,
@@ -34,6 +35,7 @@ const navigation = [
       { label: "Attendees", href: "/admin/attendees", icon: Users },
       { label: "Organizers", href: "/admin/organizers", icon: UserCog },
       { label: "Venues", href: "/admin/venues", icon: MapPin },
+      { label: "Schedule", href: "/admin/schedule", icon: CalendarClock },
     ],
   },
   {

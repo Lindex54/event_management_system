@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 "use client";
-import * as React from "react";import { useSearchParams } from "next/navigation";import { CheckCircle2,MoreHorizontal,UserCheck,UserRoundSearch } from "lucide-react";import { toast } from "sonner";import { DataTable,type ManagementColumn } from "@/components/admin/shared/data-table";import { PageHeader } from "@/components/admin/shared/page-header";import { StatusBadge } from "@/components/admin/shared/status-badge";import { Button } from "@/components/ui/button";import { Dialog,DialogContent,DialogDescription,DialogFooter,DialogHeader,DialogTitle } from "@/components/ui/dialog";import { DropdownMenu,DropdownMenuContent,DropdownMenuItem,DropdownMenuTrigger } from "@/components/ui/dropdown-menu";import { Select,SelectContent,SelectItem,SelectTrigger,SelectValue } from "@/components/ui/select";import { staffApi } from "@/lib/api/staff";
+import * as React from "react";import { useSearchParams } from "next/navigation";import { CheckCircle2,MoreHorizontal,UserRoundSearch } from "lucide-react";import { toast } from "sonner";import { DataTable,type ManagementColumn } from "@/components/admin/shared/data-table";import { PageHeader } from "@/components/admin/shared/page-header";import { StatusBadge } from "@/components/admin/shared/status-badge";import { Button } from "@/components/ui/button";import { Dialog,DialogContent,DialogDescription,DialogHeader,DialogTitle } from "@/components/ui/dialog";import { DropdownMenu,DropdownMenuContent,DropdownMenuItem,DropdownMenuTrigger } from "@/components/ui/dropdown-menu";import { Select,SelectContent,SelectItem,SelectTrigger,SelectValue } from "@/components/ui/select";import { staffApi } from "@/lib/api/staff";
 
 interface StaffEvent{id:number;name:string;}
 interface StaffAttendee{id:number;referenceCode:string;attendee:string;email:string;eventId:number;event:string;status:"Confirmed"|"Pending"|"Cancelled";checkInStatus:"Checked In"|"Not Checked In";checkedInAt:string|null;}
@@ -13,7 +13,6 @@ export function StaffAttendeesPage(){
   const[loading,setLoading]=React.useState(true);
   const[error,setError]=React.useState<string|null>(null);
   const[selected,setSelected]=React.useState<StaffAttendee|null>(null);
-  const[checkingInId,setCheckingInId]=React.useState<number|null>(null);
 
   React.useEffect(()=>{ void staffApi<StaffEvent[]>("/events").then(setEvents).catch(()=>undefined); },[]);
 
@@ -26,17 +25,6 @@ export function StaffAttendeesPage(){
     finally{ setLoading(false); }
   },[eventId]);
   React.useEffect(()=>{ void load(); },[load]);
-
-  async function checkIn(registration:StaffAttendee){
-    setCheckingInId(registration.id);
-    try{
-      const result=await staffApi<{result:string}>(`/registrations/${registration.id}/check-in`,{method:"POST"});
-      toast.success(result.result==="ALREADY_CHECKED_IN"?"Attendee was already checked in":"Attendee checked in successfully");
-      setRecords(current=>current.map(r=>r.id===registration.id?{...r,checkInStatus:"Checked In",checkedInAt:new Date().toISOString()}:r));
-      setSelected(null);
-    }catch(e){ toast.error(e instanceof Error?e.message:"Unable to check in attendee"); }
-    finally{ setCheckingInId(null); }
-  }
 
   async function confirmRegistration(registration:StaffAttendee){
     try{
@@ -59,7 +47,6 @@ export function StaffAttendeesPage(){
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={()=>setSelected(r)}><UserRoundSearch/> View Registration</DropdownMenuItem>
           <DropdownMenuItem disabled={r.status==="Confirmed"} onSelect={()=>void confirmRegistration(r)}><CheckCircle2/> Confirm</DropdownMenuItem>
-          <DropdownMenuItem disabled={r.checkInStatus==="Checked In"||r.status!=="Confirmed"} onSelect={()=>void checkIn(r)}><UserCheck/> Check In</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     )},
@@ -98,14 +85,6 @@ export function StaffAttendeesPage(){
                 <div className="flex justify-between"><span className="text-text-secondary">Registration Status</span><StatusBadge status={selected.status}/></div>
                 <div className="flex justify-between"><span className="text-text-secondary">Check-in Status</span><StatusBadge status={selected.checkInStatus}/></div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" disabled={selected.status==="Confirmed"} onClick={()=>void confirmRegistration(selected)}>
-                  <CheckCircle2/> Confirm
-                </Button>
-                <Button disabled={selected.checkInStatus==="Checked In"||selected.status!=="Confirmed"||checkingInId===selected.id} onClick={()=>void checkIn(selected)}>
-                  <UserCheck/>{selected.checkInStatus==="Checked In"?"Already Checked In":"Check In"}
-                </Button>
-              </DialogFooter>
             </>
           )}
         </DialogContent>

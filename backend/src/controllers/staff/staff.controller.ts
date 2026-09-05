@@ -125,6 +125,25 @@ export const verifyTicket: RequestHandler = async (req, res) => {
   } catch (error) { fail(res, error, "Verify ticket"); }
 };
 
+const scanMessages = { CHECKED_IN: "Attendee checked in successfully", ALREADY_CHECKED_IN: "Attendee was already checked in", CANCELLED: "Registration was cancelled", NOT_CONFIRMED: "Registration is not confirmed", INVALID_TICKET: "Invalid ticket", EVENT_MISMATCH: "Ticket belongs to a different event", NOT_ASSIGNED: "You are not assigned to this event" } as const;
+
+// A single scan (camera or manual) verifies the ticket and checks the attendee in
+// automatically. `staff(res).userId` is the signed-in staff member operating the
+// scanner device — captured from their session, not from client input.
+export const scanCheckIn: RequestHandler = async (req, res) => {
+  const eventId = positiveInteger(req.body?.eventId);
+  const rawTicket = text(req.body?.ticketToken);
+  const ticketToken = rawTicket.split(/[/?#]/).filter(Boolean).pop() ?? "";
+  const scanMethod = req.body?.scanMethod === "Manual" ? "Manual" : "Camera";
+  if (!eventId || !/^[a-f0-9]{64}$/i.test(ticketToken)) { res.status(400).json({ success: false, message: "Select an event and scan or enter a valid ticket", data: { result: "INVALID_TICKET" } }); return; }
+  try {
+    const outcome = await service.scanCheckIn(staff(res).userId, eventId, ticketToken, scanMethod);
+    if (outcome.result === "CHECKED_IN" && !outcome.registration.verifiedBy) outcome.registration.verifiedBy = staff(res).name;
+    const status = outcome.result === "NOT_ASSIGNED" ? 403 : outcome.result === "INVALID_TICKET" || outcome.result === "EVENT_MISMATCH" ? 404 : 200;
+    res.status(status).json({ success: status === 200, message: scanMessages[outcome.result], data: outcome });
+  } catch (error) { fail(res, error, "Scan ticket"); }
+};
+
 const checkInMessages: Record<string, { status: number; message: string }> = {
   CHECKED_IN: { status: 200, message: "Attendee checked in successfully" },
   ALREADY_CHECKED_IN: { status: 200, message: "Attendee was already checked in" },

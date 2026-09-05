@@ -3,7 +3,7 @@
 import * as React from "react";import { useSearchParams } from "next/navigation";import { format,isSameDay,parseISO } from "date-fns";import { Clock,MapPin,Mic2,X } from "lucide-react";import { toast } from "sonner";import { DatePickerFilter } from "@/components/admin/shared/date-picker-filter";import { PageHeader } from "@/components/admin/shared/page-header";import { Button } from "@/components/ui/button";import { Card,CardContent } from "@/components/ui/card";import { Select,SelectContent,SelectItem,SelectTrigger,SelectValue } from "@/components/ui/select";import { staffApi } from "@/lib/api/staff";
 
 interface StaffEvent{id:number;name:string;}
-interface ScheduleItem{id:number;eventId:number;event:string;speaker:string|null;title:string;description:string|null;date:string;startTime:string;endTime:string|null;room:string|null;}
+interface ScheduleItem{id:number;eventId:number;event:string;speaker:string|null;title:string;description:string|null;date:string;startTime:string;endTime:string|null;room:string|null;createdBy?:string|null;createdByRole?:string|null;}
 
 export function StaffSchedulePage(){
   const searchParams=useSearchParams();
@@ -75,6 +75,7 @@ export function StaffSchedulePage(){
                         <span className="flex items-center gap-1"><Clock className="size-3.5"/>{item.startTime}{item.endTime?` – ${item.endTime}`:""}</span>
                         {item.room && <span className="flex items-center gap-1"><MapPin className="size-3.5"/>{item.room}</span>}
                         {item.speaker && <span className="flex items-center gap-1"><Mic2 className="size-3.5"/>{item.speaker}</span>}
+                        {item.createdByRole==="Admin" && <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">Added by Admin</span>}
                       </div>
                     </CardContent>
                   </Card>

@@ -14,7 +14,7 @@ router.get("/events/:id/attendees", controller.listEventAttendees);
 router.get("/attendees", controller.listAttendees);
 router.get("/check-in/search", controller.searchCheckIn);
 router.post("/check-in/verify-ticket", controller.verifyTicket);
-router.post("/registrations/:id/check-in", controller.checkIn);
+router.post("/check-in/scan", controller.scanCheckIn);
 router.patch("/registrations/:id/status", controller.updateRegistration);
 router.get("/schedule", controller.listSchedule);
 router.post("/schedule", controller.createSchedule);

@@ -30,11 +30,6 @@ export function OrganizerRegistrationsPage(){
     try{ await organizerApi(`/registrations/${record.id}/status`,{method:"PATCH",body:JSON.stringify({status})}); toast.success(message); await load(); }
     catch(e){ toast.error(e instanceof Error?e.message:"Unable to update registration"); }
   }
-  async function checkIn(record:Registration,checkedIn:boolean){
-    try{ await organizerApi(`/registrations/${record.id}/check-in`,{method:"POST",body:JSON.stringify({checkedIn})}); toast.success(checkedIn?"Attendee checked in":"Check-in removed"); await load(); }
-    catch(e){ toast.error(e instanceof Error?e.message:"Unable to update check-in"); }
-  }
-
   const filtered=records.filter(item=>(eventFilter==="All"||String(item.eventId)===eventFilter)&&(statusFilter==="All"||item.status===statusFilter)&&(checkInFilter==="All"||item.checkIn===checkInFilter));
 
   const columns:ManagementColumn<Registration>[]=[
@@ -50,7 +45,6 @@ export function OrganizerRegistrationsPage(){
         <DropdownMenuContent align="end" className="w-52">
           <DropdownMenuItem onSelect={()=>setSelected(r)}><Eye/> View details</DropdownMenuItem>
           <DropdownMenuItem disabled={r.status==="Confirmed"} onSelect={()=>void updateStatus(r,"Confirmed","Registration confirmed")}><CheckCircle2/> Confirm</DropdownMenuItem>
-          <DropdownMenuItem disabled={r.checkIn==="Checked In"} onSelect={()=>void checkIn(r,true)}><CalendarCheck/> Check In</DropdownMenuItem>
           <DropdownMenuItem variant="destructive" disabled={r.status==="Cancelled"} onSelect={()=>setCancelling(r)}><XCircle/> Cancel</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

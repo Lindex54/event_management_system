@@ -29,6 +29,7 @@ export interface EventDiscussionDetail {
   discussionId: number | null;
   status: EventDiscussionStatus;
   isAdministrator: boolean;
+  canModerate: boolean;
   controlsActive: boolean;
   canOpen: boolean;
   canClose: boolean;

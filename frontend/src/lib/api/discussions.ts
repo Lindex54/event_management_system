@@ -21,6 +21,7 @@ export const discussionApi = {
   get: (eventId: number) => request<EventDiscussionDetail>(`/${eventId}`),
   messages: (eventId: number, afterId = 0) => request<{ discussion: EventDiscussionDetail; messages: EventDiscussionMessage[] }>(`/${eventId}/messages?afterId=${afterId}`),
   send: (eventId: number, message: string) => request<{ id: number }>(`/${eventId}/messages`, { method: "POST", body: JSON.stringify({ message }) }),
+  deleteMessage: (eventId: number, messageId: number) => request<void>(`/${eventId}/messages/${messageId}`, { method: "DELETE" }),
   open: (eventId: number) => request<void>(`/${eventId}/open`, { method: "POST" }),
   close: (eventId: number) => request<void>(`/${eventId}/close`, { method: "POST" }),
   typing: (eventId: number) => request<void>(`/${eventId}/typing`, { method: "POST" }),

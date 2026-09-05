@@ -95,8 +95,8 @@ export async function createSchedule(userId: number, input: ScheduleInput): Prom
     if (!assignment[0]) throw new Error("SPEAKER_NOT_ASSIGNED");
   }
   const [result] = await pool.execute<ResultSetHeader>(
-    "INSERT INTO event_schedule_items(event_id,speaker_id,title,description,item_date,start_time,end_time,room,sort_order)VALUES(?,?,?,?,?,?,?,?,?)",
-    [input.eventId, input.speakerId ?? null, input.title, input.description ?? null, input.date, input.startTime, input.endTime ?? null, input.room ?? null, input.sortOrder],
+    "INSERT INTO event_schedule_items(event_id,speaker_id,title,description,item_date,start_time,end_time,room,sort_order,created_by_user_id,created_by_role)VALUES(?,?,?,?,?,?,?,?,?,?,'Staff')",
+    [input.eventId, input.speakerId ?? null, input.title, input.description ?? null, input.date, input.startTime, input.endTime ?? null, input.room ?? null, input.sortOrder, userId],
   );
   return result.insertId;
 }
@@ -127,11 +127,13 @@ export async function listAttendees(userId: number, eventId?: number) {
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT r.id,r.reference_code referenceCode,CONCAT_WS(' ',p.first_name,p.last_name) attendee,p.email,
       r.event_id eventId,e.name event,r.status,
-      CASE WHEN ac.id IS NULL THEN 'Not Checked In' ELSE 'Checked In' END checkInStatus,ac.checked_in_at checkedInAt
+      CASE WHEN ac.id IS NULL THEN 'Not Checked In' ELSE 'Checked In' END checkInStatus,ac.checked_in_at checkedInAt,
+      CONCAT_WS(' ',vp.first_name,vp.last_name) verifiedBy
      FROM event_staff es JOIN events e ON e.id=es.event_id AND e.deleted_at IS NULL
      JOIN registrations r ON r.event_id=e.id AND r.deleted_at IS NULL
      JOIN attendees a ON a.id=r.attendee_id JOIN people p ON p.id=a.person_id
      LEFT JOIN attendance_check_ins ac ON ac.registration_id=r.id
+     LEFT JOIN users vu ON vu.id=ac.checked_in_by_user_id LEFT JOIN people vp ON vp.id=vu.person_id
      WHERE es.user_id=?${extra} ORDER BY r.registered_at DESC`,
     values,
   );
@@ -144,9 +146,11 @@ export async function searchAttendees(userId: number, eventId: number, query: st
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT r.id,r.reference_code referenceCode,CONCAT_WS(' ',p.first_name,p.last_name) attendee,p.email,
       r.event_id eventId,r.status,
-      CASE WHEN ac.id IS NULL THEN 'Not Checked In' ELSE 'Checked In' END checkInStatus,ac.checked_in_at checkedInAt
+      CASE WHEN ac.id IS NULL THEN 'Not Checked In' ELSE 'Checked In' END checkInStatus,ac.checked_in_at checkedInAt,
+      CONCAT_WS(' ',vp.first_name,vp.last_name) verifiedBy
      FROM registrations r JOIN attendees a ON a.id=r.attendee_id JOIN people p ON p.id=a.person_id
      LEFT JOIN attendance_check_ins ac ON ac.registration_id=r.id
+     LEFT JOIN users vu ON vu.id=ac.checked_in_by_user_id LEFT JOIN people vp ON vp.id=vu.person_id
      WHERE r.event_id=? AND r.deleted_at IS NULL
        AND (p.email LIKE ? OR CONCAT_WS(' ',p.first_name,p.last_name) LIKE ? OR r.reference_code LIKE ? OR CAST(r.id AS CHAR) LIKE ? OR r.ticket_token=?)
      ORDER BY p.first_name LIMIT 25`,
@@ -178,6 +182,92 @@ export async function verifyTicket(userId: number, eventId: number, ticketToken:
   if (registration.status !== "Confirmed") return { result: "NOT_CONFIRMED", registration };
   if (registration.checkInStatus === "Checked In") return { result: "ALREADY_CHECKED_IN", registration };
   return { result: "VALID", registration };
+}
+
+export type ScanResult =
+  | { result: "CHECKED_IN" | "ALREADY_CHECKED_IN"; registration: RowDataPacket }
+  | { result: "CANCELLED" | "NOT_CONFIRMED"; registration: RowDataPacket }
+  | { result: "INVALID_TICKET" | "EVENT_MISMATCH" | "NOT_ASSIGNED" };
+
+// Verifies a scanned ticket and, when valid, checks the attendee in immediately —
+// all in one transaction so a single camera scan is enough to validate and admit
+// an attendee. `scannedByUserId` is always the authenticated staff member whose
+// device performed the scan; every attempt (successful or not) is logged to
+// attendance_scan_logs for the admin's audit trail.
+export async function scanCheckIn(
+  scannedByUserId: number,
+  eventId: number,
+  ticketToken: string,
+  scanMethod: "Camera" | "Manual" = "Camera",
+): Promise<ScanResult> {
+  if (!(await isAssigned(scannedByUserId, eventId))) {
+    await logScan(eventId, null, scannedByUserId, scanMethod, "NOT_ASSIGNED");
+    return { result: "NOT_ASSIGNED" };
+  }
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [rows] = await connection.query<RowDataPacket[]>(
+      `SELECT r.id,r.reference_code referenceCode,CONCAT_WS(' ',p.first_name,p.last_name) attendee,p.email,r.event_id eventId,r.status,
+        ac.id AS checkInId,ac.checked_in_at checkedInAt,CONCAT_WS(' ',vp.first_name,vp.last_name) verifiedBy
+       FROM registrations r JOIN attendees a ON a.id=r.attendee_id JOIN people p ON p.id=a.person_id
+       LEFT JOIN attendance_check_ins ac ON ac.registration_id=r.id
+       LEFT JOIN users vu ON vu.id=ac.checked_in_by_user_id LEFT JOIN people vp ON vp.id=vu.person_id
+       WHERE r.ticket_token=? AND r.deleted_at IS NULL LIMIT 1 FOR UPDATE`,
+      [ticketToken],
+    );
+    const registration = rows[0];
+    if (!registration) {
+      await connection.rollback();
+      await logScan(eventId, null, scannedByUserId, scanMethod, "INVALID_TICKET");
+      return { result: "INVALID_TICKET" };
+    }
+    registration.checkInStatus = registration.checkInId ? "Checked In" : "Not Checked In";
+    if (Number(registration.eventId) !== eventId) {
+      await connection.rollback();
+      await logScan(eventId, registration.id, scannedByUserId, scanMethod, "EVENT_MISMATCH");
+      return { result: "EVENT_MISMATCH" };
+    }
+    if (registration.status === "Cancelled") {
+      await connection.rollback();
+      await logScan(eventId, registration.id, scannedByUserId, scanMethod, "CANCELLED");
+      return { result: "CANCELLED", registration };
+    }
+    if (registration.status !== "Confirmed") {
+      await connection.rollback();
+      await logScan(eventId, registration.id, scannedByUserId, scanMethod, "NOT_CONFIRMED");
+      return { result: "NOT_CONFIRMED", registration };
+    }
+    if (registration.checkInId) {
+      await connection.rollback();
+      await logScan(eventId, registration.id, scannedByUserId, scanMethod, "ALREADY_CHECKED_IN");
+      return { result: "ALREADY_CHECKED_IN", registration };
+    }
+    await connection.execute("INSERT INTO attendance_check_ins(registration_id,checked_in_by_user_id)VALUES(?,?)", [registration.id, scannedByUserId]);
+    await connection.commit();
+    await logScan(eventId, registration.id, scannedByUserId, scanMethod, "CHECKED_IN");
+    registration.checkInStatus = "Checked In";
+    registration.checkedInAt = new Date().toISOString();
+    return { result: "CHECKED_IN", registration };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function logScan(
+  eventId: number,
+  registrationId: number | null,
+  scannedByUserId: number,
+  scanMethod: "Camera" | "Manual",
+  result: string,
+): Promise<void> {
+  await pool.execute(
+    "INSERT INTO attendance_scan_logs(event_id,registration_id,scanned_by_user_id,scan_method,result)VALUES(?,?,?,?,?)",
+    [eventId, registrationId, scannedByUserId, scanMethod, result],
+  );
 }
 
 export async function checkInRegistration(userId: number, registrationId: number): Promise<CheckInResult> {
@@ -213,10 +303,12 @@ export async function listSchedule(userId: number, eventId?: number) {
   if (eventId) { extra = " AND e.id=?"; values.push(eventId); }
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT s.id,s.event_id eventId,e.name event,CONCAT_WS(' ',p.first_name,p.last_name) speaker,s.title,s.description,
-      DATE_FORMAT(s.item_date,'%Y-%m-%d') date,TIME_FORMAT(s.start_time,'%H:%i') startTime,TIME_FORMAT(s.end_time,'%H:%i') endTime,s.room
+      DATE_FORMAT(s.item_date,'%Y-%m-%d') date,TIME_FORMAT(s.start_time,'%H:%i') startTime,TIME_FORMAT(s.end_time,'%H:%i') endTime,s.room,
+      s.created_by_role createdByRole,CONCAT_WS(' ',cp.first_name,cp.last_name) createdBy
      FROM event_staff es JOIN events e ON e.id=es.event_id
      JOIN event_schedule_items s ON s.event_id=e.id AND s.deleted_at IS NULL
      LEFT JOIN speakers sp ON sp.id=s.speaker_id LEFT JOIN people p ON p.id=sp.person_id
+     LEFT JOIN users cu ON cu.id=s.created_by_user_id LEFT JOIN people cp ON cp.id=cu.person_id
      WHERE es.user_id=?${extra} ORDER BY s.item_date,s.start_time,s.sort_order`,
     values,
   );
