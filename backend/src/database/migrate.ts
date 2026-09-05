@@ -59,9 +59,22 @@ async function migrate() {
         continue;
       }
 
-      console.log(`Applying migration: ${file}`);
-      for (const statement of statements(sql)) await connection.query(statement);
-      await connection.execute("INSERT INTO schema_migrations(migration_name,checksum) VALUES(?,?)", [file, checksum]);
+      const migrationStatements = statements(sql);
+      console.log(`Applying migration: ${file} (${migrationStatements.length} statements)`);
+      for (let index = 0; index < migrationStatements.length; index += 1) {
+        try {
+          await connection.query(migrationStatements[index]!);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Unknown SQL error";
+          throw new Error(`Migration ${file} failed at statement ${index + 1}/${migrationStatements.length} (${databaseErrorCode(error)}): ${message}`);
+        }
+      }
+      try {
+        await connection.execute("INSERT INTO schema_migrations(migration_name,checksum) VALUES(?,?)", [file, checksum]);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown migration recording error";
+        throw new Error(`Migration ${file} ran but could not be recorded (${databaseErrorCode(error)}): ${message}`);
+      }
       console.log(`Migration applied: ${file}`);
     }
   } finally {

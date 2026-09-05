@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_reset_token_hash VARCHAR(255) NULL,
     password_reset_expires_at DATETIME NULL,
     last_active_at DATETIME NULL,
+    welcome_email_sent_at DATETIME NULL DEFAULT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL DEFAULT NULL,
