@@ -15,7 +15,7 @@ interface RegistrationResponse {
   referenceCode: string;
   ticketUrl: string;
   accountSetupRequired: boolean;
-  emailSent: boolean;
+  emailQueued: boolean;
 }
 
 export function RegisterAction({ eventSlug, eventName, full, closed }: { eventSlug: string; eventName: string; full: boolean; closed: boolean }) {
@@ -51,7 +51,6 @@ export function RegisterAction({ eventSlug, eventName, full, closed }: { eventSl
       setTicket(result.data);
       toast.success("Registration successful");
       toast.success("Ticket generated and ready");
-      if (!result.data.emailSent) toast.warning("Your ticket was created, but the confirmation email could not be sent. Save the ticket link now.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to register for this event");
     } finally {
@@ -72,7 +71,7 @@ export function RegisterAction({ eventSlug, eventName, full, closed }: { eventSl
             <div className="rounded-xl border border-border bg-muted/40 p-4">
               <p className="text-xs font-medium text-text-secondary">Registration reference</p>
               <p className="mt-1 font-mono font-semibold tracking-wide text-text-primary">{ticket.referenceCode}</p>
-              <p className="mt-3 text-sm text-text-secondary">{ticket.accountSetupRequired ? "Check your email to set your password and enter the attendee dashboard." : "Check your email for the ticket, then sign in to your attendee dashboard."}</p>
+              <p className="mt-3 text-sm text-text-secondary">Your ticket link is available immediately below. {ticket.accountSetupRequired ? "Your password setup email is being sent now." : "Your confirmation email is being sent now."}</p>
             </div>
             <DialogFooter><Button asChild><Link href={ticket.ticketUrl}><Ticket /> View Ticket</Link></Button></DialogFooter>
           </>

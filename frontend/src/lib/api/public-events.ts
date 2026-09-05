@@ -42,6 +42,21 @@ export interface PublicEventDetail extends PublicEvent {
   speakers: PublicSpeaker[];
 }
 
+function sameOriginUploadUrl(value: string | null): string | null {
+  if (!value) return null;
+  if (value.startsWith("/uploads/")) return value;
+  try {
+    const url = new URL(value);
+    return url.pathname.startsWith("/uploads/") ? `${url.pathname}${url.search}` : value;
+  } catch {
+    return value;
+  }
+}
+
+function normalizePublicEvent<T extends PublicEvent>(event: T): T {
+  return { ...event, imageUrl: sameOriginUploadUrl(event.imageUrl), agendaUrl: sameOriginUploadUrl(event.agendaUrl) };
+}
+
 export interface PublicTicket {
   registrationId: number;
   referenceCode: string;
@@ -75,7 +90,7 @@ export async function listPublicEvents(): Promise<PublicEvent[]> {
   const response = await fetch(`${BACKEND_ORIGIN}/api/events`, { cache: "no-store" });
   const result = await response.json();
   if (!response.ok || !result.success) throw new Error(result.message ?? "Unable to load events");
-  return result.data;
+  return (result.data as PublicEvent[]).map(normalizePublicEvent);
 }
 
 export async function getPublicEvent(slug: string): Promise<PublicEventDetail | null> {
@@ -83,7 +98,11 @@ export async function getPublicEvent(slug: string): Promise<PublicEventDetail | 
   if (response.status === 404) return null;
   const result = await response.json();
   if (!response.ok || !result.success) throw new Error(result.message ?? "Unable to load this event");
-  return result.data;
+  const event = result.data as PublicEventDetail;
+  return {
+    ...normalizePublicEvent(event),
+    speakers: event.speakers.map((speaker) => ({ ...speaker, photoUrl: sameOriginUploadUrl(speaker.photoUrl) })),
+  };
 }
 
 export async function getPublicTicket(token: string): Promise<PublicTicket | null> {

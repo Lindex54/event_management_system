@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { CalendarClock, CalendarDays, Clock, ImageOff, MapPin, Mic2, Users } from "lucide-react";
 
 import { AgendaSection } from "@/components/events/agenda-section";
+import { EventCountdown } from "@/components/events/event-countdown";
 import { RegisterAction } from "@/components/events/register-action";
 import { PublicFooter } from "@/components/layout/public-footer";
 import { PublicHeader } from "@/components/layout/public-header";
@@ -105,6 +106,8 @@ export default async function EventDetailPage({ params }: { params: Promise<{ sl
           <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
             <Card className="shadow-none">
               <CardContent className="space-y-4 p-6">
+                <EventCountdown date={event.date} time={event.time} timeZone={event.timezone} />
+                <div className="border-t border-border" />
                 <div className="space-y-3 text-sm text-text-secondary">
                   <p className="flex items-center gap-2.5"><CalendarDays className="size-4 shrink-0 text-primary" />{event.dateLabel}</p>
                   {event.time && <p className="flex items-center gap-2.5"><Clock className="size-4 shrink-0 text-primary" />{event.time}{event.endTime ? ` – ${event.endTime}` : ""}</p>}

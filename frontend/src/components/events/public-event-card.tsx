@@ -36,7 +36,7 @@ export function PublicEventCard({ event, featured = false, showOrganizer = false
           {event.description && <p className="mt-4 line-clamp-2 border-t border-border pt-4 text-xs text-text-secondary">{event.description}</p>}
           {showOrganizer && <p className="mt-3 text-xs text-text-secondary">Organized by <span className="font-semibold text-text-primary">{event.organizer}</span></p>}
           <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-primary transition-colors group-hover:text-primary-dark">
-            {full ? "View Event" : "Register for Event"}
+            View Event
             <ArrowRight className="size-4" aria-hidden="true" />
           </span>
         </CardContent>

@@ -1,0 +1,19 @@
+-- 006_add_event_staff_assignment_role.sql
+
+SET @assignment_role_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'event_staff'
+      AND COLUMN_NAME = 'assignment_role'
+);
+
+SET @assignment_role_sql := IF(
+    @assignment_role_exists = 0,
+    'ALTER TABLE event_staff ADD COLUMN assignment_role VARCHAR(50) NOT NULL DEFAULT ''staff''',
+    'SELECT 1'
+);
+
+PREPARE assignment_role_statement FROM @assignment_role_sql;
+EXECUTE assignment_role_statement;
+DEALLOCATE PREPARE assignment_role_statement;

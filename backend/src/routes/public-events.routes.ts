@@ -78,14 +78,13 @@ router.post("/:slug/register", async (request, response) => {
       response.status(detail.status).json({ success: false, message: detail.message, data: { result: outcome.result } });
       return;
     }
-    let emailSent = true;
-    try { await sendRegistrationConfirmation({ ...outcome, email, fullName }); }
-    catch (mailError) { emailSent = false; console.error("Registration confirmation email failed", mailError); }
     response.status(201).json({
       success: true,
-      message: emailSent ? "Registration confirmed. Your ticket has been emailed." : "Registration confirmed, but the email could not be sent. Save your ticket now.",
-      data: { result: outcome.result, referenceCode: outcome.referenceCode, ticketUrl: outcome.ticketUrl, accountSetupRequired: outcome.accountSetupRequired, emailSent },
+      message: "Registration confirmed. Your ticket is ready and the confirmation email is being sent.",
+      data: { result: outcome.result, referenceCode: outcome.referenceCode, ticketUrl: outcome.ticketUrl, accountSetupRequired: outcome.accountSetupRequired, emailQueued: true },
     });
+    void sendRegistrationConfirmation({ ...outcome, email, fullName })
+      .catch((mailError) => console.error("Registration confirmation email failed", mailError));
   } catch (error) { sendDatabaseError(response, error, "Register participant"); }
 });
 

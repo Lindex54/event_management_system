@@ -37,7 +37,7 @@ export const uploadEventImage: RequestHandler = async (request, response) => {
     const directory = path.resolve(process.cwd(), "uploads", "events");
     await mkdir(directory, { recursive: true });
     await writeFile(path.join(directory, fileName), image, { flag: "wx" });
-    const imageUrl = `${request.protocol}://${request.get("host")}/uploads/events/${fileName}`;
+    const imageUrl = `/uploads/events/${fileName}`;
     response.status(201).json({ success: true, message: "Event image uploaded", data: { imageUrl } });
   } catch (error) {
     console.error("Event image upload failed", error);
@@ -77,7 +77,7 @@ export const uploadEventAgenda: RequestHandler = async (request, response) => {
     const directory = path.resolve(process.cwd(), "uploads", "agendas");
     await mkdir(directory, { recursive: true });
     await writeFile(path.join(directory, fileName), file, { flag: "wx" });
-    const agendaUrl = `${request.protocol}://${request.get("host")}/uploads/agendas/${fileName}`;
+    const agendaUrl = `/uploads/agendas/${fileName}`;
     response.status(201).json({ success: true, message: "Agenda file uploaded", data: { agendaUrl, agendaFileType: mimeType, agendaFileName: originalName || fileName } });
   } catch (error) {
     console.error("Agenda upload failed", error);
