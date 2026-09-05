@@ -49,28 +49,84 @@ router.post("/", async (request, response) => {
     const [roleRows] = await connection.query<RowDataPacket[]>("SELECT id FROM roles WHERE name=? LIMIT 1", [role]);
     if (!roleRows[0]) throw new Error("ROLE_MISSING");
 
-    const [person] = await connection.execute<ResultSetHeader>(
-      "INSERT INTO people(first_name,last_name,email,telephone)VALUES(?,?,?,?)",
-      [firstName, lastName, email, optionalText(request.body?.telephone)],
+    const [existingRows] = await connection.query<RowDataPacket[]>(
+      `SELECT p.id AS personId,u.id AS userId,u.deleted_at AS userDeletedAt
+       FROM people p
+       LEFT JOIN users u ON u.person_id=p.id
+       WHERE p.email=?
+       LIMIT 1 FOR UPDATE`,
+      [email],
     );
+    const existing = existingRows[0];
+    if (existing?.userId && existing.userDeletedAt === null) {
+      await connection.rollback();
+      response.status(409).json({ success: false, message: "A user with this email address already exists" });
+      return;
+    }
+    if (username) {
+      const [usernameRows] = await connection.query<RowDataPacket[]>(
+        "SELECT id FROM users WHERE username=? LIMIT 1 FOR UPDATE",
+        [username],
+      );
+      if (usernameRows[0] && Number(usernameRows[0].id) !== Number(existing?.userId)) {
+        await connection.rollback();
+        response.status(409).json({ success: false, message: "This administrator username is already in use" });
+        return;
+      }
+    }
+
+    const restored = Boolean(existing?.userId);
+    let personId: number;
+    let userId: number;
     const placeholderHash = await hashPassword(randomBytes(32).toString("hex"));
-    const [user] = await connection.execute<ResultSetHeader>(
-      "INSERT INTO users(person_id,username,password_hash,status)VALUES(?,?,?,'Active')",
-      [person.insertId, username, placeholderHash],
-    );
+
+    if (existing) {
+      personId = Number(existing.personId);
+      await connection.execute(
+        "UPDATE people SET first_name=?,last_name=?,telephone=?,deleted_at=NULL WHERE id=?",
+        [firstName, lastName, optionalText(request.body?.telephone), personId],
+      );
+    } else {
+      const [person] = await connection.execute<ResultSetHeader>(
+        "INSERT INTO people(first_name,last_name,email,telephone)VALUES(?,?,?,?)",
+        [firstName, lastName, email, optionalText(request.body?.telephone)],
+      );
+      personId = person.insertId;
+    }
+
+    if (existing?.userId) {
+      userId = Number(existing.userId);
+      await connection.execute(
+        `UPDATE users SET username=?,password_hash=?,status='Active',failed_login_attempts=0,locked_at=NULL,
+          email_verified_at=NULL,password_reset_token_hash=NULL,password_reset_expires_at=NULL,
+          welcome_email_sent_at=NULL,deleted_at=NULL WHERE id=?`,
+        [username, placeholderHash, userId],
+      );
+      await connection.execute("UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,CURRENT_TIMESTAMP) WHERE user_id=?", [userId]);
+      await connection.execute("UPDATE account_setup_tokens SET used_at=COALESCE(used_at,CURRENT_TIMESTAMP) WHERE user_id=?", [userId]);
+      await connection.execute("UPDATE password_reset_tokens SET used_at=COALESCE(used_at,CURRENT_TIMESTAMP) WHERE user_id=?", [userId]);
+      await connection.execute("DELETE FROM user_roles WHERE user_id=?", [userId]);
+    } else {
+      const [user] = await connection.execute<ResultSetHeader>(
+        "INSERT INTO users(person_id,username,password_hash,status)VALUES(?,?,?,'Active')",
+        [personId, username, placeholderHash],
+      );
+      userId = user.insertId;
+    }
+
     await connection.execute(
       "INSERT INTO user_roles(user_id,role_id,assigned_by_user_id)VALUES(?,?,?)",
-      [user.insertId, roleRows[0].id, response.locals.administrator.id],
+      [userId, roleRows[0].id, response.locals.administrator.id],
     );
     await connection.commit();
 
-    const token = await createSetupToken(user.insertId, response.locals.administrator.id);
+    const token = await createSetupToken(userId, response.locals.administrator.id);
     try {
       await sendInvitationEmail({ to: email, name: `${firstName} ${lastName}`, roleName: formatRoleName(role === "System Administrator" ? "system-administrator" : "event-staff"), token });
-      response.status(201).json({ success: true, message: "User created and an invitation email was sent", id: user.insertId });
+      response.status(201).json({ success: true, message: restored ? "User restored and a new invitation email was sent" : "User created and an invitation email was sent", id: userId });
     } catch (mailError) {
       console.error("Invitation email failed to send", mailError);
-      response.status(201).json({ success: true, message: "User created, but the invitation email could not be sent. Ask them to contact support.", id: user.insertId });
+      response.status(201).json({ success: true, message: restored ? "User restored, but the invitation email could not be sent. Use Resend setup link to try again." : "User created, but the invitation email could not be sent. Ask them to contact support.", id: userId });
     }
   } catch (error) {
     await connection.rollback();
