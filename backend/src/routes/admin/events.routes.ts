@@ -17,7 +17,40 @@ router.get("/staff-options",async(_request,response)=>{try{const[rows]=await poo
 router.get("/:id/co-organizers",async(request,response)=>{const id=positiveId(request.params.id);if(!id){response.status(400).json({success:false,message:"Valid event ID is required"});return;}try{const[event]=await pool.query<RowDataPacket[]>("SELECT 1 FROM events WHERE id=? AND deleted_at IS NULL",[id]);if(!event[0]){response.status(404).json({success:false,message:"Event not found"});return;}const[rows]=await pool.query<RowDataPacket[]>("SELECT es.user_id userId,CONCAT_WS(' ',p.first_name,p.last_name) name,p.email,es.assignment_role assignmentRole,es.assigned_at assignedAt FROM event_staff es JOIN users u ON u.id=es.user_id JOIN people p ON p.id=u.person_id WHERE es.event_id=? ORDER BY name",[id]);response.json({success:true,data:rows});}catch(error){sendDatabaseError(response,error,"List co-organizers");}});
 router.put("/:id/co-organizers",async(request,response)=>{const id=positiveId(request.params.id);const rawIds=Array.isArray(request.body?.userIds)?request.body.userIds:null;const userIds=rawIds?.every((v:unknown)=>positiveInteger(v)!==null)?rawIds.map((v:unknown)=>positiveInteger(v) as number):null;if(!id||!userIds){response.status(400).json({success:false,message:"Valid event ID and staff selection are required"});return;}const connection=await pool.getConnection();try{await connection.beginTransaction();const[event]=await connection.query<RowDataPacket[]>("SELECT 1 FROM events WHERE id=? AND deleted_at IS NULL FOR UPDATE",[id]);if(!event[0]){await connection.rollback();response.status(404).json({success:false,message:"Event not found"});return;}if(userIds.length){const[valid]=await connection.query<RowDataPacket[]>(`SELECT u.id FROM users u JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id WHERE r.slug='event-staff' AND u.id IN (${userIds.map(()=>"?").join(",")})`,userIds);if(valid.length!==new Set(userIds).size){await connection.rollback();response.status(400).json({success:false,message:"All selected users must be active Event Staff members"});return;}}await connection.execute("DELETE FROM event_staff WHERE event_id=?",[id]);for(const userId of userIds){await connection.execute("INSERT INTO event_staff(event_id,user_id,assignment_role,assigned_by_user_id)VALUES(?,?,?,NULL)",[id,userId,"co_organizer"]);}await connection.commit();response.json({success:true,message:"Co-organizers updated"});}catch(error){await connection.rollback();sendDatabaseError(response,error,"Update co-organizers");}finally{connection.release();}});
 
-router.get("/:id",async(request,response)=>{const id=positiveId(request.params.id);if(!id){response.status(400).json({success:false,message:"Valid event ID is required"});return;}try{const[rows]=await pool.query<RowDataPacket[]>(`${selectEvents} HAVING e.id=?`,[id]);if(!rows[0]){response.status(404).json({success:false,message:"Event not found"});return;}response.json({success:true,data:rows[0]});}catch(error){sendDatabaseError(response,error,"Get event");}});
+router.get("/:id",async(request,response)=>{
+  const id=positiveId(request.params.id);
+  if(!id){response.status(400).json({success:false,message:"Valid event ID is required"});return;}
+  try{
+    const[rows]=await pool.query<RowDataPacket[]>(`${selectEvents} HAVING e.id=?`,[id]);
+    if(!rows[0]){response.status(404).json({success:false,message:"Event not found"});return;}
+    const[[registrations],[schedule],[speakers]]=await Promise.all([
+      pool.query<RowDataPacket[]>(`SELECT r.id,r.reference_code referenceCode,r.attendee_id attendeeId,
+        CONCAT_WS(' ',p.first_name,p.last_name) participant,p.email,p.telephone,
+        DATE_FORMAT(r.registered_at,'%b %e, %Y') registeredAt,r.status,
+        CASE WHEN ac.id IS NULL THEN 'Not Checked In' ELSE 'Checked In' END checkIn,
+        ac.checked_in_at checkedInAt,CONCAT_WS(' ',vp.first_name,vp.last_name) verifiedBy
+        FROM registrations r JOIN attendees a ON a.id=r.attendee_id JOIN people p ON p.id=a.person_id
+        LEFT JOIN attendance_check_ins ac ON ac.registration_id=r.id
+        LEFT JOIN users vu ON vu.id=ac.checked_in_by_user_id LEFT JOIN people vp ON vp.id=vu.person_id
+        WHERE r.event_id=? AND r.deleted_at IS NULL ORDER BY r.registered_at DESC`,[id]),
+      pool.query<RowDataPacket[]>(`SELECT s.id,s.title,s.description,DATE_FORMAT(s.item_date,'%Y-%m-%d') date,
+        TIME_FORMAT(s.start_time,'%H:%i') startTime,TIME_FORMAT(s.end_time,'%H:%i') endTime,s.room,
+        CONCAT_WS(' ',p.first_name,p.last_name) speaker,s.created_by_role createdByRole,
+        CONCAT_WS(' ',cp.first_name,cp.last_name) createdBy
+        FROM event_schedule_items s LEFT JOIN speakers sp ON sp.id=s.speaker_id
+        LEFT JOIN people p ON p.id=sp.person_id LEFT JOIN users cu ON cu.id=s.created_by_user_id
+        LEFT JOIN people cp ON cp.id=cu.person_id
+        WHERE s.event_id=? AND s.deleted_at IS NULL ORDER BY s.item_date,s.start_time,s.sort_order`,[id]),
+      pool.query<RowDataPacket[]>(`SELECT sp.id,CONCAT_WS(' ',p.first_name,p.last_name) name,p.email,p.telephone,
+        sp.professional_title title,sp.organization,sp.speaker_type type,es.invitation_status status
+        FROM event_speakers es JOIN speakers sp ON sp.id=es.speaker_id AND sp.deleted_at IS NULL
+        JOIN people p ON p.id=sp.person_id WHERE es.event_id=? ORDER BY sp.created_at`,[id]),
+    ]);
+    const attendees=registrations.map(({attendeeId,participant,email,telephone,status,checkIn})=>({id:attendeeId,name:participant,email,telephone,registrationStatus:status,checkIn}));
+    const checkIns=registrations.filter((registration)=>registration.checkedInAt).map(({id,referenceCode,participant,checkedInAt,verifiedBy})=>({id,referenceCode,participant,checkedInAt,verifiedBy}));
+    response.json({success:true,data:{...rows[0],registrationRecords:registrations,attendees,schedule,speakers,checkIns}});
+  }catch(error){sendDatabaseError(response,error,"Get event");}
+});
 
 router.post("/",async(request,response)=>{const name=text(request.body?.name),organizerId=positiveInteger(request.body?.organizerId),venueId=positiveInteger(request.body?.venueId),date=text(request.body?.date),capacity=positiveInteger(request.body?.capacity),status=text(request.body?.status)||"Draft",timezone=text(request.body?.timezone)||"Africa/Nairobi",agendaType=text(request.body?.agendaType)||"None";if(!name||!organizerId||!venueId||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!capacity||!statuses.has(status)||!agendaTypes.has(agendaType)){response.status(400).json({success:false,message:"Name, organizer, venue, date, positive capacity, and valid status are required"});return;}const agendaUrl=agendaType==="None"?null:optionalText(request.body?.agendaUrl);if(agendaType!=="None"&&!agendaUrl){response.status(400).json({success:false,message:"An agenda file or URL is required when an agenda type is selected"});return;}try{const[result]=await pool.execute<ResultSetHeader>(`INSERT INTO events(organizer_id,venue_id,name,slug,theme,description,event_date,start_time,end_time,timezone,capacity,status,image_url,image_alt,is_featured,registration_closes_at,agenda_type,agenda_url,agenda_file_name,agenda_file_type)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,[organizerId,venueId,name,slug(name),optionalText(request.body?.theme),optionalText(request.body?.description),date,optionalText(request.body?.startTime),optionalText(request.body?.endTime),timezone,capacity,status,optionalText(request.body?.imageUrl),optionalText(request.body?.imageAlt),Boolean(request.body?.featured),optionalText(request.body?.registrationClosesAt),agendaType,agendaUrl,agendaType==="File"?optionalText(request.body?.agendaFileName):null,agendaType==="File"?optionalText(request.body?.agendaFileType):null]);response.status(201).json({success:true,message:"Event created",id:result.insertId});}catch(error){sendDatabaseError(response,error,"Create event");}});
 

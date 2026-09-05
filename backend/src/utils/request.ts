@@ -1,6 +1,6 @@
 import type { Response } from "express";
 
-import { databaseErrorCode } from "../config/database";
+import { databaseErrorCode, databaseErrorSqlMessage } from "../config/database";
 
 export function positiveId(value: unknown): number | null {
   const parsed = Number(value);
@@ -23,7 +23,8 @@ export function positiveInteger(value: unknown): number | null {
 
 export function sendDatabaseError(response: Response, error: unknown, action: string): void {
   const code = databaseErrorCode(error);
-  console.error(`${action} failed (${code})`);
+  const sqlMessage = databaseErrorSqlMessage(error);
+  console.error(`${action} failed (${code})${sqlMessage ? `: ${sqlMessage}` : ""}`);
   if (code === "ER_DUP_ENTRY") {
     response.status(409).json({ success: false, message: "A record with those unique details already exists" });
     return;

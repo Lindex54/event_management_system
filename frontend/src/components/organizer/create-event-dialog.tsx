@@ -111,13 +111,23 @@ export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpen
     if (agendaType === "File" && !agendaFile && !existingAgendaFileName) { setError("Upload an agenda file, or switch the agenda type to None."); return; }
     setSaving(true); setError("");
     try {
+      const imageUploadPromise = imageFile
+        ? readAsDataUrl(imageFile).then((dataUrl) => api<{ imageUrl: string }>("/uploads/event-image", {
+            method: "POST",
+            body: JSON.stringify({ dataUrl, originalName: imageFile.name }),
+          }))
+        : Promise.resolve(null);
+      const agendaUploadPromise = agendaType === "File" && agendaFile
+        ? readAsDataUrl(agendaFile).then((dataUrl) => api<{ agendaUrl: string; agendaFileType: string; agendaFileName: string }>("/uploads/event-agenda", {
+            method: "POST",
+            body: JSON.stringify({ dataUrl, originalName: agendaFile.name }),
+          }))
+        : Promise.resolve(null);
+      const [imageUpload, agendaUpload] = await Promise.all([imageUploadPromise, agendaUploadPromise]);
+
       let savedImageUrl = imageUrl.trim();
-      if (imageFile) {
-        const upload = await api<{ imageUrl: string }>("/uploads/event-image", {
-          method: "POST",
-          body: JSON.stringify({ dataUrl: await readAsDataUrl(imageFile), originalName: imageFile.name }),
-        });
-        savedImageUrl = upload.imageUrl ?? "";
+      if (imageUpload) {
+        savedImageUrl = imageUpload.imageUrl ?? "";
         if (!savedImageUrl) throw new Error("The server did not return the uploaded image path");
       }
 
@@ -125,12 +135,8 @@ export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpen
       if (agendaType === "Url") {
         agendaPayload = { agendaType: "Url", agendaUrl: agendaUrl.trim(), agendaFileName: null, agendaFileType: null };
       } else if (agendaType === "File") {
-        if (agendaFile) {
-          const upload = await api<{ agendaUrl: string; agendaFileType: string; agendaFileName: string }>("/uploads/event-agenda", {
-            method: "POST",
-            body: JSON.stringify({ dataUrl: await readAsDataUrl(agendaFile), originalName: agendaFile.name }),
-          });
-          agendaPayload = { agendaType: "File", agendaUrl: upload.agendaUrl, agendaFileName: upload.agendaFileName, agendaFileType: upload.agendaFileType };
+        if (agendaUpload) {
+          agendaPayload = { agendaType: "File", agendaUrl: agendaUpload.agendaUrl, agendaFileName: agendaUpload.agendaFileName, agendaFileType: agendaUpload.agendaFileType };
         } else {
           agendaPayload = { agendaType: "File", agendaUrl: event?.agendaUrl ?? null, agendaFileName: event?.agendaFileName ?? null, agendaFileType: event?.agendaFileType ?? null };
         }
@@ -142,10 +148,12 @@ export function CreateEventDialog({ trigger, event, open: controlledOpen, onOpen
         capacity: Number(capacity), status, imageUrl: savedImageUrl, imageAlt, ...agendaPayload,
       }) });
       const eventId = event?.id ?? saved?.id;
-      if (showCoOrganizers && eventId) {
+      if (showCoOrganizers && eventId && (Boolean(event) || coOrganizerIds.length > 0)) {
         await api(`/events/${eventId}/co-organizers`, { method: "PUT", body: JSON.stringify({ userIds: coOrganizerIds }) });
       }
-      toast.success(event ? "Event updated" : "Event created"); await onSaved?.(); changeOpen(false);
+      toast.success(event ? "Event updated" : "Event created");
+      changeOpen(false);
+      if (onSaved) void Promise.resolve().then(onSaved).catch(() => toast.error("Event saved, but the event list could not be refreshed"));
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to save event"); }
     finally { setSaving(false); }
   }
